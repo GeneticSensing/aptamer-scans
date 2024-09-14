@@ -1,18 +1,24 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 """
 Created on Wed Aug 14 19:44:09 2024
+Last Revised on Sat Sep 14 13:04:09 2024
 
 @author: ssadm
 """
 
 import csv
-import numpy as np
-from lmfit import minimize, Parameters, report_fit
-import matplotlib.pyplot as plt
 import os
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+from lmfit import minimize, Parameters, report_fit
+
 # Pre-fill CSV file path and name for standalone execution
-filename = "Glcucose - 1.5 mM A.csv"
+FILENAME = "Glucose - 1.5 mM A.csv"
 
 # Function to model the curve I(t) = (A * exp(-t/tau)) + B
 def model_function(params, t):
@@ -40,7 +46,7 @@ def read_csv(file_name):
     return np.array(xdata), np.array(ydata)
 
 # Convert dataframe to numpy arrays
-def read_df(df):
+def read_df(df: pd.DataFrame):
     title = df.columns[0]
     xdata = df.iloc[1:, 0].astype(float).to_list()
     ydata = df.iloc[1:, 1].astype(float).to_list()
@@ -58,14 +64,15 @@ def perform_curve_fitting(xdata, ydata, filename):
 
     # Perform the least squares minimization
     result = minimize(residuals, params, args=(xdata, ydata))
+    params: Parameters = result.params
 
     # Print the fitting results
-    report_fit(result.params)
+    report_fit(params)
 
     # Plot the data and the fitted curve
     plt.figure()
     plt.scatter(xdata, ydata, label='Data')
-    plt.plot(xdata, model_function(result.params, xdata), label='Best Fit', color='red')
+    plt.plot(xdata, model_function(params, xdata), label='Best Fit', color='red')
     plt.xlabel('Time (s)')
     plt.ylabel('Current (uA)')
     plt.legend()
@@ -74,11 +81,11 @@ def perform_curve_fitting(xdata, ydata, filename):
     plt.savefig(fig_path)
     plt.close()
 
-    return result.params
+    return params
 
 # Main function for standalone execution
 def main():
-    xdata, ydata = read_csv(filename)
+    xdata, ydata = read_csv(FILENAME)
     perform_curve_fitting(xdata, ydata)
 
 # Allow the script to be both callable as a library and runnable as a standalone program

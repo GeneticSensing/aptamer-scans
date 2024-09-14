@@ -1,4 +1,6 @@
-# Description: This script is used to run the PSTraceSeparation and CA_Lifetime_Finder scripts together.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 Created on Fri Sep 6 17:40 2024
 
@@ -22,6 +24,7 @@ def save_summary_csv(summary):
         for row in summary:
             writer.writerow([row['filename'], row['params']['A'].value, row['params']['tau'].value])
 
+# Description: This script is used to run the PSTraceSeparation and CA_Lifetime_Finder scripts together.
 def main():
     if os.getcwd() != os.path.dirname(os.path.abspath(__file__)):
         if not os.getcwd().endswith('Chronoamperometry-Aptasensor'):
@@ -36,6 +39,5 @@ def main():
         summary.append({'params': params, 'filename': title})
     save_summary_csv(summary)
 
-# If the script is run directly, execute the function with the predefined spreadsheet name
 if __name__ == "__main__":
     main()
