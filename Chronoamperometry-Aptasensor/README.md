@@ -1,1 +1,0 @@
-Execute Python scripts in the root directory (where this file is located).
