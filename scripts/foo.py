@@ -27,7 +27,7 @@ def save_summary_csv(summary):
 # Description: This script is used to run the PSTraceSeparation and CA_Lifetime_Finder scripts together.
 def main():
     if os.getcwd() != os.path.dirname(os.path.abspath(__file__)):
-        if not os.getcwd().endswith('Chronoamperometry-Aptasensor'):
+        if not os.getcwd().endswith('Chronoamperometry-Aptamer'):
             raise Exception("Please run this script from the same directory as the script or project directory.")
         os.chdir('scripts')
 
