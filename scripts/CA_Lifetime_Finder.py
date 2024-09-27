@@ -64,10 +64,9 @@ def perform_curve_fitting(xdata, ydata, filename):
 
     # Perform the least squares minimization
     result = minimize(residuals, params, args=(xdata, ydata))
-    params: Parameters = result.params
 
     # Print the fitting results
-    report_fit(params)
+    report_fit(result.params)
 
     # Plot the data and the fitted curve
     plt.figure()
@@ -81,7 +80,7 @@ def perform_curve_fitting(xdata, ydata, filename):
     plt.savefig(fig_path)
     plt.close()
 
-    return params
+    return result.params
 
 # Main function for standalone execution
 def main():
