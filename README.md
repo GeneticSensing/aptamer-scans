@@ -30,6 +30,6 @@ python3 -m plot_advanced_swv # SWV measurement
 python3 -m plot_ca # CA measurement
 ```
 
-Here's a [document](https://mcmasteru365-my.sharepoint.com/:w:/g/personal/maka9_mcmaster_ca/Efdt9OWZqZZOsVK4q_6w3oYBpbUoHyyxUG8_DpgKnCxJOw?e=ourUAt) for further explanation.  
+Here's a [document](https://mcmasteru365-my.sharepoint.com/:w:/g/personal/maka9_mcmaster_ca/Efdt9OWZqZZOsVK4q_6w3oYBpbUoHyyxUG8_DpgKnCxJOw?e=ourUAt) to use PalmSens MethodSCRIPT Examples repo.
 
 _Note_: Emstat Pico's cannot be recognized as a MethodSCRIPT device under MacOS.
