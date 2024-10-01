@@ -1,10 +1,10 @@
 # Chronoamperometry-Aptamer
 
-This repository contains the code and data for the Chronoamperometry-Aptamer project.
+This repository contains the code and data for the Chronoamperometry-Aptamer project. There will be an upcoming change to use Square Wave Voltammetry (SWV) instead of Chronoamperometry (CA).
 
-## Finding and Plotting CA Lifetimes
+## Finding and Plotting SWV Measurements
 
-Export the spreadsheet from PSTrace into the `/sheets` directory. In `foo.py`, change the spreadsheet name exported from PSTrace and run it. Once successfully run, the resulting findings should be placed in `/csv` as well as a `summary.csv` to show $A$ and $\tau$ for each concentration. The findings are also plotted and curve fitted with `lmfit`'s minimizer. These can be found under `/figs`.
+Export the spreadsheet from PSTrace into the `/sheets` directory. In `swv_processing.py`, change the spreadsheet name exported from PSTrace and run it. Once successfully run, the resulting findings should be placed in `/csv` as well as a `summary.csv` to show $A$ and $\tau$ for each concentration.
 
 ## Running SWV and CA Measurements on Emstat Pico
 
