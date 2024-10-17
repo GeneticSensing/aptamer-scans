@@ -14,7 +14,7 @@ set_range_minmax da -500m 90m
 set_range ba 100u
 set_autoranging ba 1n 100u
 cell_on
-# Measure SWV: E, I, I_fwd, I_rev, E_begin, E_end, E_step, E_amp, freq
+# Measure SWV for calibration: E, I, I_fwd, I_rev, E_begin, E_end, E_step, E_amp, freq
 meas_loop_swv p c f r -500m 0 1m 50m 5
 	pck_start
 	pck_add p
@@ -23,7 +23,7 @@ meas_loop_swv p c f r -500m 0 1m 50m 5
 	pck_add r
 	pck_end
 endloop
-# Reverse SWV
+# Reverse SWV for calibration
 meas_loop_swv p c f r -500m 0 1m 50m 100
 	pck_start
 	pck_add p
