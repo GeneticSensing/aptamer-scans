@@ -9,7 +9,7 @@ set_pgstat_chan 1
 set_pgstat_mode 0
 set_pgstat_chan 0
 set_pgstat_mode 2
-set_max_bandwidth 100k
+set_max_bandwidth 1k
 set_range_minmax da -500m 90m
 set_range ba 100u
 set_autoranging ba 1n 100u
@@ -24,7 +24,7 @@ meas_loop_swv p c f r -500m 0 1m 50m 5
 	pck_end
 endloop
 # Reverse SWV for calibration
-meas_loop_swv p c f r -500m 0 1m 50m 100
+meas_loop_swv p c f r -500m 0 1m 50m 50
 	pck_start
 	pck_add p
 	pck_add c
