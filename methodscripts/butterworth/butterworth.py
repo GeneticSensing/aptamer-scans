@@ -6,7 +6,7 @@ from io import StringIO
 from scipy.signal import butter, filtfilt
 
 # CSV path
-SWV_CSV_PATH = 'ms_plot_swv_100hz.csv'
+SWV_CSV_PATH = 'ms_plot_swv_90hz.csv'
 
 
 def convert_csv_to_df(path: str) -> pd.DataFrame:
@@ -32,7 +32,7 @@ def convert_csv_to_df(path: str) -> pd.DataFrame:
 def filter(signal: np.ndarray, cutoff_frequency: float) -> np.ndarray:
   # Parameters
   sampling_rate = 100  # Hz
-  order = 5
+  order = 2
 
   # Apply the filter
   nyquist = sampling_rate / 2
@@ -49,7 +49,7 @@ def display(df: pd.DataFrame):
     plt.plot(df.iloc[:, 0], df.iloc[:, i], label=df.columns[i])
   plt.xlabel(df.columns[0])
   plt.ylabel('Current [A]')
-  plt.title('Original and Filtered Signals (100 Hz sampling rate)')
+  plt.title('Original and Filtered Signals (90 Hz sampling rate)')
   plt.legend()
   plt.grid(True)
   plt.show()
@@ -59,17 +59,13 @@ def main():
   df = convert_csv_to_df(SWV_CSV_PATH)
   signal = df.iloc[:, 1].to_numpy()
 
-  # Filter the data
-  filtered_signal_15 = filter(signal, 15)
-  filtered_signal_5 = filter(signal, 5)
-  filtered_signal_2 = filter(signal, 2)
+  # Filter data and add to dataframe
+  df['WE current filtered [A] (3 Hz)'] = filter(signal, 3)
+  df['WE current filtered [A] (2 Hz)'] = filter(signal, 2)
+  df['WE current filtered [A] (1 Hz)'] = filter(signal, 1)
 
   # Save the filtered data
-  df['WE current filtered [A] (15 Hz)'] = filtered_signal_15
-  df['WE current filtered [A] (5 Hz)'] = filtered_signal_5
-  df['WE current filtered [A] (2 Hz)'] = filtered_signal_2
-
-  df.to_csv('ms_plot_swv_100hz_filtered.csv', index=False)
+  df.to_csv('ms_plot_swv_90hz_filtered.csv', index=False)
 
   # Plot the original and filtered signals
   display(df)
