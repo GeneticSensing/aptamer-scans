@@ -3,13 +3,11 @@ var c
 var p
 var f
 var r
-var i
-store_var i 0i ja
 set_pgstat_chan 1
 set_pgstat_mode 0
 set_pgstat_chan 0
 set_pgstat_mode 2
-set_max_bandwidth 100k
+set_max_bandwidth 1k
 set_range_minmax da -500m 90m
 set_range ba 100u
 set_autoranging ba 1n 100u

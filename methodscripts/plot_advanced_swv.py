@@ -79,7 +79,7 @@ DEVICE_PORT = None
 
 # Location of MethodSCRIPT file to use.
 MSCRIPT_FILE_PATH_ES4 = ''
-MSCRIPT_FILE_PATH_ESPICO = 'scripts/advanced_swv_espico.mscr'
+MSCRIPT_FILE_PATH_ESPICO = 'scripts/swv_espico.mscr'
 
 # Location of output files. Directory will be created if it does not exist.
 OUTPUT_PATH = 'output'
