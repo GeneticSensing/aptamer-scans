@@ -6,7 +6,7 @@ from io import StringIO
 from scipy.signal import butter, filtfilt
 
 # CSV path
-SWV_CSV_PATH = 'ms_plot_swv_90hz.csv'
+SWV_CSV_PATH = 'csv/ms_plot_swv_90hz.csv'
 
 
 def convert_csv_to_df(path: str) -> pd.DataFrame:
@@ -65,7 +65,7 @@ def main():
   df['WE current filtered [A] (1 Hz)'] = filter(signal, 1)
 
   # Save the filtered data
-  df.to_csv('ms_plot_swv_90hz_filtered.csv', index=False)
+  df.to_csv('output/ms_plot_swv_90hz_filtered.csv', index=False)
 
   # Plot the original and filtered signals
   display(df)

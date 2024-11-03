@@ -3,8 +3,6 @@ var c
 var p
 var f
 var r
-var i
-store_var i 0i ja
 set_pgstat_chan 1
 set_pgstat_mode 0
 set_pgstat_chan 0
@@ -24,7 +22,7 @@ meas_loop_swv p c f r -500m 0 1m 50m 5
 	pck_end
 endloop
 # Reverse SWV for calibration
-meas_loop_swv p c f r -500m 0 1m 50m 50
+meas_loop_swv p c f r -500m 0 1m 50m 100
 	pck_start
 	pck_add p
 	pck_add c
