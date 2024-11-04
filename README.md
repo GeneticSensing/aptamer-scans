@@ -27,7 +27,7 @@ python3 -m venv my-venv # my-venv can be any arbitrary name
 source my-venv/bin/activate
 pip3 install -r requirements.txt
 python3 -m plot_advanced_swv # SWV measurement
-python3 -m plot_advanced_partial_swv # CA measurement
+python3 -m plot_advanced_partial_swv # Partial SWV measurement
 ```
 
 Here's a [document](https://mcmasteru365-my.sharepoint.com/:w:/g/personal/maka9_mcmaster_ca/Efdt9OWZqZZOsVK4q_6w3oYBpbUoHyyxUG8_DpgKnCxJOw?e=ourUAt) to use PalmSens MethodSCRIPT Examples repo.
