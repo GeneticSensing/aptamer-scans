@@ -6,7 +6,7 @@ This repository contains the code and data for the Chronoamperometry-Aptamer pro
 
 Export the spreadsheet from PSTrace into the `/sheets` directory. In `swv_processing.py`, change the spreadsheet name exported from PSTrace and run it. Once successfully run, the resulting findings should be placed in `/csv` as well as a `summary.csv` to show $A$ and $\tau$ for each concentration.
 
-## Running SWV and CA Measurements on Emstat Pico
+## Running SWV Measurements on Emstat Pico
 
 ### On a Windows computer:
 
@@ -14,7 +14,7 @@ Export the spreadsheet from PSTrace into the `/sheets` directory. In `swv_proces
 cd methodscripts
 pip3 install -r requirements.txt
 python3 -m plot_advanced_swv # SWV measurement
-python3 -m plot_ca # CA measurement
+python3 -m plot_advanced_partial_swv # Partial SWV measurement
 ```
 
 Resulting plots are saved under `/methodscripts/output`.  
@@ -27,7 +27,7 @@ python3 -m venv my-venv # my-venv can be any arbitrary name
 source my-venv/bin/activate
 pip3 install -r requirements.txt
 python3 -m plot_advanced_swv # SWV measurement
-python3 -m plot_ca # CA measurement
+python3 -m plot_advanced_partial_swv # CA measurement
 ```
 
 Here's a [document](https://mcmasteru365-my.sharepoint.com/:w:/g/personal/maka9_mcmaster_ca/Efdt9OWZqZZOsVK4q_6w3oYBpbUoHyyxUG8_DpgKnCxJOw?e=ourUAt) to use PalmSens MethodSCRIPT Examples repo.
