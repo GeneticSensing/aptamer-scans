@@ -41,9 +41,9 @@ LOG = logging.getLogger(__name__)
 DEVICE_PORT = None
 
 # Location of MethodSCRIPT file to use.
-SWV_ESPICO_PATH = 'scripts/swv_espico.mscr'
-PARTIAL_SWV_ESPICO_TEMPLATE_PATH = 'scripts/partial_swv_espico_template.mscr'
-PARTIAL_SWV_ESPICO_PATH = 'scripts/partial_swv_espico.mscr'
+SWV_ES_PATH = 'scripts/swv_es.mscr'
+PARTIAL_SWV_ES_TEMPLATE_PATH = 'scripts/partial_swv_es_template.mscr'
+PARTIAL_SWV_ES_PATH = 'scripts/partial_swv_es.mscr'
 
 # Location of output files. Directory will be created if it does not exist.
 OUTPUT_PATH = 'output'
@@ -134,7 +134,10 @@ def find_peak_and_baseline(x: np.ndarray, y: np.ndarray) -> typing.Tuple[float, 
   if len(peaks) > 1:
     print("More than one peak found!")
     # Return peak with the max current
-    i_max_peak = np.argmax(y[peaks])
+    i_max_peak = 0
+    for i in range(len(peaks)):
+        if y[peaks[i]] > y[peaks[i_max_peak]]:
+            i = i_max_peak
     return x[peaks[i_max_peak]], x[properties['left_bases'][i_max_peak]]
   return x[peaks[0]], x[properties['left_bases'][0]]
   
@@ -148,6 +151,7 @@ class ScanTracker:
   def __init__(self, file_path="scan_tracker.json"):
     self.file_path = file_path
     self.data = load_json(file_path)
+    self.device_type = None
 
   def increment_scan(self):
     self.data["num_scans"] += 1
@@ -165,8 +169,9 @@ class ScanTracker:
     trunc_y = yvalues_filtered[start:end]
     peak, baseline = find_peak_and_baseline(trunc_x, trunc_y)
     self.data["peak"] = peak
-    self.data["left_baseline"] = peak
+    self.data["left_baseline"] = baseline
     save_json(self.data, self.file_path)
+    return yvalues_filtered
 
   def get_replacements(self):
     left_baseline = self.data["left_baseline"]
@@ -180,7 +185,7 @@ class ScanTracker:
     }
 
 
-def plot_curves(curves: list[list[list[palmsens.mscript.MScriptVar]]], base_path: str, scan_tracker: ScanTracker=None, partial=False):
+def plot_curves(curves: list[list[list[palmsens.mscript.MScriptVar]]], base_path: str, scan_tracker: ScanTracker, partial=False):
   """
   Plots curves. If 'partial' is True, the plot will separate baseline and peak segments.
   """
@@ -201,7 +206,6 @@ def plot_curves(curves: list[list[list[palmsens.mscript.MScriptVar]]], base_path
   color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
   # Loop through all curves
-  print(len(curves))
   for icurve, curve in enumerate(curves):
     xvalues = palmsens.mscript.get_values_by_column(curves, XAXIS_COLUMN_INDEX, icurve)
 
@@ -221,12 +225,12 @@ def plot_curves(curves: list[list[list[palmsens.mscript.MScriptVar]]], base_path
         # Associated baseline and peak curves have same colour
         color = color_cycle[((icurve * len(YAXIS_COLUMN_INDICES) + iy_axis) % (len(YAXIS_COLUMN_INDICES) * 2)) % len(color_cycle)]
         plt.plot(xvalues, yvalues, color=color, label=label)
-      else:
-        # Standard single plot for calibration
-        plt.plot(xvalues, yvalues, label=label)
+        continue
+      # Standard single plot for calibration
+      elif icurve == 1 and iy_axis == 0:
         # Determine peak and baseline for subsequent partial scans
-        if icurve == 1 and iy_axis == 0:
-          scan_tracker.update_peak_values(xvalues, yvalues)
+        yvalues = scan_tracker.update_peak_values(xvalues, yvalues)
+      plt.plot(xvalues, yvalues, label=label)
 
   # Display the legend and save the plot
   plt.legend()
@@ -246,9 +250,10 @@ def perform_scan(script_path: str, scan_tracker: ScanTracker, partial=False):
   with palmsens.serial.Serial(port, 1) as comm:
     device = palmsens.instrument.Instrument(comm)
     device_type = device.get_device_type()
-    if device_type != palmsens.instrument.DeviceType.EMSTAT_PICO:
+    if device_type != palmsens.instrument.DeviceType.EMSTAT_PICO and 'EmStat4' not in device_type:
       comm.close()
-      raise RuntimeError("Device is not an Emstat Pico")
+      raise RuntimeError("Device is not an Emstat Pico or EmStat4")
+    scan_tracker.device_type = device_type
     LOG.info('Connected to %s.', device_type)
 
     # Read and send the MethodSCRIPT file.
@@ -279,11 +284,11 @@ def main():
   scan_tracker = ScanTracker()
 
   if scan_tracker.is_calibration_scan():
-    perform_scan(SWV_ESPICO_PATH, scan_tracker)
+    perform_scan(SWV_ES_PATH, scan_tracker)
   else:
     replacements = scan_tracker.get_replacements()
-    update_method_script(PARTIAL_SWV_ESPICO_TEMPLATE_PATH, PARTIAL_SWV_ESPICO_PATH, replacements)
-    perform_scan(PARTIAL_SWV_ESPICO_PATH, scan_tracker, partial=True)
+    update_method_script(PARTIAL_SWV_ES_TEMPLATE_PATH, PARTIAL_SWV_ES_PATH, replacements)
+    perform_scan(PARTIAL_SWV_ES_PATH, scan_tracker, partial=True)
 
 
 if __name__ == '__main__':

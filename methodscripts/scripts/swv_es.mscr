@@ -3,8 +3,6 @@ var c
 var p
 var f
 var r
-set_pgstat_chan 1
-set_pgstat_mode 0
 set_pgstat_chan 0
 set_pgstat_mode 2
 set_max_bandwidth 1k
