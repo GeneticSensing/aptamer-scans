@@ -1,0 +1,31 @@
+e
+array cs 1000
+var c
+var p
+var np
+var i
+var t
+set_pgstat_chan 1
+set_pgstat_mode 0
+set_pgstat_chan 0
+set_pgstat_mode 2
+set_range ba 200u
+set_max_bandwidth 1G
+set_e -100m
+cell_on
+wait 1
+meas_fast_ca p cs np -300m 400u 1
+cell_off
+store_var i 0i ja
+loop i < np
+	array_get cs i c
+	copy_var i t
+	int_to_float t
+	alter_vartype t eb
+	mul_var t 1m
+	pck_start
+	pck_add t
+	pck_add c
+	pck_end
+	add_var i 1i
+endloop
