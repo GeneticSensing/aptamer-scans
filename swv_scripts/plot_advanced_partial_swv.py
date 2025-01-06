@@ -55,6 +55,8 @@ XAXIS_COLUMN_INDEX = 0
 # Indices of columns to put on the y axis. The variables must be same type.
 YAXIS_COLUMN_INDICES = [1, 2, 3]
 
+N = 10  # Every Nth scan is a calibration scan
+
 ### End of configuration
 
 def write_curves_to_csv(file: typing.IO, curves: list[list[list[palmsens.mscript.MScriptVar]]]):
@@ -155,7 +157,7 @@ class ScanTracker:
     save_json(self.data, self.file_path)
 
   def is_calibration_scan(self):
-    return self.data["num_scans"] % 10 == 0
+    return self.data["num_scans"] % N == 0
 
   def update_peak_values(self, xvalues: np.ndarray, yvalues: np.ndarray):
     # Filter data using butterworth
