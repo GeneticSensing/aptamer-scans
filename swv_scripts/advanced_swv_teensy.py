@@ -64,7 +64,7 @@ import typing
 
 # Third-party imports
 import matplotlib.pyplot as plt
-import RPi.GPIO as GPIO
+import gpiod
 
 # Local imports
 import palmsens.instrument
@@ -108,6 +108,9 @@ YAXIS_COLUMN_INDICES = [1, 2, 3]
 
 OUTPUT_PIN = 23  # GPIO 23 to send signal to Teensy
 INPUT_PIN = 24   # GPIO 24 to receive signal from Teensy
+chip = gpiod.Chip('gpiochip4')
+output_line = chip.get_line(OUTPUT_PIN)
+input_line = chip.get_line(INPUT_PIN)
 
 LOG = logging.getLogger(__name__)
 
@@ -121,12 +124,9 @@ def setup():
     logging.getLogger('PIL.PngImagePlugin').setLevel(logging.INFO)
 
     # Pin configuration
-    GPIO.setmode(GPIO.BCM)
-    # Set up GPIO pins
-    GPIO.setup(OUTPUT_PIN, GPIO.OUT)
-    GPIO.setup(INPUT_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-    # Set up interrupt for receiving acknowledgment from Teensy
-    GPIO.add_event_detect(INPUT_PIN, GPIO.RISING, callback=teensy_acknowledged)
+    output_line.request(consumer="RPi-Teensy", type=gpiod.LINE_REQ_DIR_OUT)
+    input_line.request(consumer="RPi-Teensy", type=gpiod.LINE_REQ_EV_BOTH_EDGES)
+    
 
 ###############################################################################
 # End of configuration
@@ -254,9 +254,9 @@ def run_measurement():
     print("Raspberry Pi: Function completed. Sending acknowledgment to Teensy.")
 
     # Send short pulse as acknowledgement signal to Teensy
-    GPIO.output(OUTPUT_PIN, GPIO.HIGH)
+    output_line.set_value(1)
     time.sleep(0.1)
-    GPIO.output(OUTPUT_PIN, GPIO.LOW)
+    output_line.set_value(0)
 
 # Function to execute when Teensy acknowledgment is received
 def teensy_acknowledged(_):
@@ -269,9 +269,20 @@ def main():
         setup()
         run_measurement()
         while True:
+            # Wait for an edge event (blocking wait with timeout of 10 seconds)
+            event = input_line.event_wait()
+            if event:
+                # Process the edge event
+                event_details = input_line.event_read()
+                if event_details.event_type == gpiod.LineEvent.RISING_EDGE:
+                    teensy_acknowledged()
+
+            # Keep the program running indefinitely
             time.sleep(1)
+            
     finally:
-        GPIO.cleanup()
+        output_line.release()
+        input_line.release()
 
 
 if __name__ == '__main__':
