@@ -59,7 +59,7 @@ _Note_: If using Windows computer, setting up a virtual environment is not requi
 1. **Create a virtual environment**:  
   `my-venv` can be any arbitrary name.
   ```bash
-  python3 -m venv my-venv
+  python3 -m venv --system-site-packages my-venv
   ```
 
 2. **Activate the virtual environment**:  
@@ -183,4 +183,5 @@ The same software and hardware setup for the full SWV measurements is required f
 ## Additional Prerequisites
 1. Teensy must be connected to the RPi.
 2. The `swv_scripts/teensy/swv_mux/swv_mux.ino` must be compiled and loaded onto the Teensy as a `HEX` file. This can be done using the Arduino IDE or CLI.
-3. The RPi **must** but used. The `RPi.GPIO` library enables communication between RPi and Teensy GPIO pins.
+3. Install `sudo apt install python3-libgpiod`
+4. The RPi **must** but used. The `RPi.GPIO` library enables communication between RPi and Teensy GPIO pins.
