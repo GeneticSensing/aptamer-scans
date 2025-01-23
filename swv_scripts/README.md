@@ -183,5 +183,7 @@ The same software and hardware setup for the full SWV measurements is required f
 ## Additional Prerequisites
 1. Teensy must be connected to the RPi.
 2. The `swv_scripts/teensy/swv_mux/swv_mux.ino` must be compiled and loaded onto the Teensy as a `HEX` file. This can be done using the Arduino IDE or CLI.
+    - To compile the `.ino` file to a `.hex` file, run this command with Arduino CLI installed. `arduino-cli compile --fqbn teensy:avr:teensy40 --output-dir swv_scripts/teensy/swv_mux swv_scripts/teensy/swv_mux/swv_mux.ino`
+    - Then load the `HEX` file onto the Teensy using Teensyloader CLI. `teensy_loader_cli --mcu=TEENSY40 -w swv_scripts/teensy/swv_mux/swv_mux.ino.hex`
 3. Install `sudo apt install python3-libgpiod`
 4. The RPi **must** but used. The `RPi.GPIO` library enables communication between RPi and Teensy GPIO pins.
