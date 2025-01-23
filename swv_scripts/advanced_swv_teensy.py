@@ -59,10 +59,12 @@ import logging
 import os
 import os.path
 import sys
+import time
 import typing
 
 # Third-party imports
 import matplotlib.pyplot as plt
+import RPi.GPIO as GPIO
 
 # Local imports
 import palmsens.instrument
@@ -104,12 +106,31 @@ XAXIS_COLUMN_INDEX = 0
 # Indices of columns to put on the y axis. The variables must be same type.
 YAXIS_COLUMN_INDICES = [1, 2, 3]
 
+OUTPUT_PIN = 23  # GPIO 23 to send signal to Teensy
+INPUT_PIN = 24   # GPIO 24 to receive signal from Teensy
+
+LOG = logging.getLogger(__name__)
+
+def setup():
+    # Configure the logging.
+    logging.basicConfig(level=logging.DEBUG, format='[%(module)s] %(message)s', stream=sys.stdout)
+    # Uncomment the following line to reduce the log level of our library.
+    # logging.getLogger('palmsens').setLevel(logging.INFO)
+    # Disable excessive logging from matplotlib.
+    logging.getLogger('matplotlib').setLevel(logging.INFO)
+    logging.getLogger('PIL.PngImagePlugin').setLevel(logging.INFO)
+
+    # Pin configuration
+    GPIO.setmode(GPIO.BCM)
+    # Set up GPIO pins
+    GPIO.setup(OUTPUT_PIN, GPIO.OUT)
+    GPIO.setup(INPUT_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    # Set up interrupt for receiving acknowledgment from Teensy
+    GPIO.add_event_detect(INPUT_PIN, GPIO.RISING, callback=teensy_acknowledged)
+
 ###############################################################################
 # End of configuration
 ###############################################################################
-
-
-LOG = logging.getLogger(__name__)
 
 
 def write_curves_to_csv(file: typing.IO, curves: list[list[list[palmsens.mscript.MScriptVar]]]):
@@ -144,14 +165,7 @@ def write_curves_to_csv(file: typing.IO, curves: list[list[list[palmsens.mscript
 
 def run_measurement():
     """Run the example."""
-    # Configure the logging.
-    logging.basicConfig(level=logging.DEBUG, format='[%(module)s] %(message)s',
-                        stream=sys.stdout)
-    # Uncomment the following line to reduce the log level of our library.
-    # logging.getLogger('palmsens').setLevel(logging.INFO)
-    # Disable excessive logging from matplotlib.
-    logging.getLogger('matplotlib').setLevel(logging.INFO)
-    logging.getLogger('PIL.PngImagePlugin').setLevel(logging.INFO)
+    print("Raspberry Pi: Running SWV measurement...")
 
     # Determine unique name for plot and files.
     base_name = datetime.datetime.now().strftime('ms_plot_swv_%Y%m%d-%H%M%S')
@@ -235,14 +249,30 @@ def run_measurement():
     # Generate legend.
     plt.legend()
     plt.savefig(base_path + '.png')
+    plt.close()
+
+    print("Raspberry Pi: Function completed. Sending acknowledgment to Teensy.")
+
+    # Send short pulse as acknowledgement signal to Teensy
+    GPIO.output(OUTPUT_PIN, GPIO.HIGH)
+    time.sleep(0.1)
+    GPIO.output(OUTPUT_PIN, GPIO.LOW)
+
+# Function to execute when Teensy acknowledgment is received
+def teensy_acknowledged(_):
+    print("Raspberry Pi: Received acknowledgment from Teensy.")
+    run_measurement()
     
-    
-    # TCP Setup for integration with Teensy
-    
-    
-    # main(), listens for signal from Teensy, then execeutes run_measurement
-    # Once run_measurement finishes execution, send signal to Teensy
+# Listens for signal from Teensy, then runs measurement
+def main():
+    try:
+        setup()
+        run_measurement()
+        while True:
+            time.sleep(1)
+    finally:
+        GPIO.cleanup()
 
 
 if __name__ == '__main__':
-    run_measurement()
+    main()

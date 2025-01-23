@@ -177,3 +177,10 @@ The same software and hardware setup for the full SWV measurements is required f
 **Figure 8-9**: Sample Partial SWV Measurement Plot, and comparison between partial and full SWV measurements.
 
 </div>
+
+# Plotting SWV with Teensy, Raspberry Pi, and Emstat4 or Emstat Pico Guide
+
+## Additional Prerequisites
+1. Teensy must be connected to the RPi.
+2. The `swv_scripts/teensy/swv_mux/swv_mux.ino` must be compiled and loaded onto the Teensy as a `HEX` file. This can be done using the Arduino IDE or CLI.
+3. The RPi **must** but used. The `RPi.GPIO` library enables communication between RPi and Teensy GPIO pins.
