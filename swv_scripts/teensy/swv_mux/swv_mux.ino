@@ -1,5 +1,5 @@
-#define INPUT_PIN 2   // Pin 2 to receive signal from Raspberry Pi
-#define OUTPUT_PIN 3  // Pin 3 to send signal to Raspberry Pi
+#define INPUT_PIN 18   // Pin 2 to receive signal from Raspberry Pi
+#define OUTPUT_PIN 19  // Pin 3 to send signal to Raspberry Pi
 
 volatile bool triggerFunction = false;  // Flag to indicate interrupt occurred
 
