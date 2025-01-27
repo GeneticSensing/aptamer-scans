@@ -106,11 +106,12 @@ XAXIS_COLUMN_INDEX = 0
 # Indices of columns to put on the y axis. The variables must be same type.
 YAXIS_COLUMN_INDICES = [1, 2, 3]
 
-OUTPUT_PIN = 23  # GPIO 23 to send signal to Teensy
-INPUT_PIN = 24   # GPIO 24 to receive signal from Teensy
+OUTPUT_PIN = 11  # Pin 23 to send signal to Teensy
+INPUT_PIN = 8   # Pin 24 to receive signal from Teensy
 chip = gpiod.Chip('gpiochip4')
 output_line = chip.get_line(OUTPUT_PIN)
 input_line = chip.get_line(INPUT_PIN)
+print(output_line, input_line)
 
 LOG = logging.getLogger(__name__)
 
@@ -255,11 +256,11 @@ def run_measurement():
 
     # Send short pulse as acknowledgement signal to Teensy
     output_line.set_value(1)
-    time.sleep(0.1)
+    time.sleep(1)
     output_line.set_value(0)
 
 # Function to execute when Teensy acknowledgment is received
-def teensy_acknowledged(_):
+def teensy_acknowledged():
     print("Raspberry Pi: Received acknowledgment from Teensy.")
     run_measurement()
     
@@ -274,7 +275,7 @@ def main():
             if event:
                 # Process the edge event
                 event_details = input_line.event_read()
-                if event_details.event_type == gpiod.LineEvent.RISING_EDGE:
+                if event_details.type == gpiod.LineEvent.RISING_EDGE:
                     teensy_acknowledged()
 
             # Keep the program running indefinitely

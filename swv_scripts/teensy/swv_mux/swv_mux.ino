@@ -1,5 +1,5 @@
-#define INPUT_PIN 18   // Pin 2 to receive signal from Raspberry Pi
-#define OUTPUT_PIN 19  // Pin 3 to send signal to Raspberry Pi
+#define INPUT_PIN 18   // Pin 18 to receive signal from Raspberry Pi
+#define OUTPUT_PIN 19  // Pin 19 to send signal to Raspberry Pi
 
 volatile bool triggerFunction = false;  // Flag to indicate interrupt occurred
 
@@ -33,4 +33,9 @@ void loop() {
     muxSwitch();
     Serial.println("Teensy: Waiting for signal from Raspberry Pi...");
   }
+  // Send acknowledgment signal
+  digitalWrite(OUTPUT_PIN, HIGH);
+  delay(100);  // Send a short pulse
+  digitalWrite(OUTPUT_PIN, LOW);
+  delay(1000);
 }
