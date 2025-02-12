@@ -59,6 +59,14 @@ void handleInterrupt() {
   triggerFunction = true;
 }
 
+void latch() {
+  SPI.beginTransaction(spiconfig);
+  digitalWrite(selectPin1, LOW);
+  SPI.transfer(keepChnl);
+  digitalWrite(selectPin1, HIGH);
+  SPI.endTransaction();
+}
+
 // the setup function runs once when you press reset or power the board
 void setup() {
 
@@ -77,16 +85,11 @@ void setup() {
   SPI.begin();
   Serial.begin(38400);
 
+  latch();
 }
 
 // the loop function runs over and over again forever
 void loop() {
-
-  SPI.beginTransaction(spiconfig);
-  digitalWrite(selectPin1, LOW);
-  SPI.transfer(keepChnl);
-  digitalWrite(selectPin1, HIGH);
-  SPI.endTransaction();
 
   // check to see if the pushbutton has been pressed
   // commands Teensy to change MUX channel
@@ -109,6 +112,7 @@ void loop() {
       Serial.println("Teensy: Completed. Sending signal to RPi to start next measurement.");
       chnlChangeAck();
     }
+    latch();
   }
 }
 
