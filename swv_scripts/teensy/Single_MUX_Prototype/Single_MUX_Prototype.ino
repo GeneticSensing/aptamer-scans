@@ -10,8 +10,8 @@
   model, check the Technical Specs of your board at:
   https://www.arduino.cc/en/Main/Products
 
-  modified by 11 Feb 2025
-  by Sadman Sakib
+  modified by 12 Feb 2025
+  by Sadman Sakib, Adam Mak
 */
 
 // include the SPI and Bounce libraries
@@ -103,14 +103,13 @@ void loop() {
     SPI.endTransaction();
 
     if (chnlIndex == totalChnls - 1){
-      Serial.println("Teensy: Completed. Sending signal to RPi to start next measurement.");
+      Serial.println("Teensy: Fulll cycle completed. Sending signal to RPi to finish.");
       cycleCompleteAck();
     } else {
-      Serial.println("Teensy: Fulll cycle completed. Sending signal to RPi to finish.");
+      Serial.println("Teensy: Completed. Sending signal to RPi to start next measurement.");
       chnlChangeAck();
     }
   }
-
 }
 
 void chnlChangeAck() {
@@ -121,6 +120,7 @@ void chnlChangeAck() {
   digitalWrite(chChangeAckPin, LOW);
   Serial.println(chnlIndex);
   Serial.println("Channel Changed!");
+  delay(1000);
 }
 
 void cycleCompleteAck() {
@@ -130,4 +130,5 @@ void cycleCompleteAck() {
   delay(10);
   digitalWrite(cycleAckPin, LOW);
   Serial.println("Cycle Complete!");
+  delay(1000);
 }
