@@ -91,6 +91,7 @@ void loop() {
   // check to see if the pushbutton has been pressed
   // commands Teensy to change MUX channel
   if (triggerFunction) {
+    triggerFunction = false;  // reset the flag
     Serial.println("Teensy: Sending instruction to MUX");
 
     chnlIndex = (chnlIndex + 1) % totalChnls;  // Cycle through channels
