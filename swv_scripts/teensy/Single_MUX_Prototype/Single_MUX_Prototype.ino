@@ -85,6 +85,13 @@ void setup() {
   SPI.begin();
   Serial.begin(38400);
 
+  // initialize MUX to first channel
+  SPI.beginTransaction(spiconfig);
+  digitalWrite(selectPin1, LOW);
+  SPI.transfer(chnls[chnlIndex]);
+  digitalWrite(selectPin1, HIGH);
+  SPI.endTransaction();
+
   latch();
 }
 
