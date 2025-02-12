@@ -71,7 +71,7 @@ void setup() {
   pinMode(selectPin1, OUTPUT);
 
   // initiate MUX channel switch when receiving pulse from RPi
-  attachInterrupt(digitalPinToInterrupt(INPUT_PIN), handleInterrupt, RISING);
+  attachInterrupt(digitalPinToInterrupt(chChangePin), handleInterrupt, RISING);
 
   // initialize SPI and Serial communication
   SPI.begin();
