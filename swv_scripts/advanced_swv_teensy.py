@@ -106,12 +106,12 @@ XAXIS_COLUMN_INDEX = 0
 # Indices of columns to put on the y axis. The variables must be same type.
 YAXIS_COLUMN_INDICES = [1, 2, 3]
 
-OUTPUT_PIN = 11  # Pin 23 to send signal to Teensy
-INPUT_PIN = 8   # Pin 24 to receive signal from Teensy
+CH_CHANGE_PIN     = 11  # Pin 23 to send signal to Teensy
+CH_CHANGE_ACK_PIN = 8   # Pin 24 to receive signal from Teensy
+CYCLE_ACK_PIN     = 7   # Pin 26 to receive signal from Teensy
 chip = gpiod.Chip('gpiochip4')
-output_line = chip.get_line(OUTPUT_PIN)
-input_line = chip.get_line(INPUT_PIN)
-print(output_line, input_line)
+ch_change_line = chip.get_line(CH_CHANGE_PIN)
+output_lines = chip.get_lines([CH_CHANGE_ACK_PIN, CYCLE_ACK_PIN])
 
 LOG = logging.getLogger(__name__)
 
@@ -125,8 +125,8 @@ def setup():
     logging.getLogger('PIL.PngImagePlugin').setLevel(logging.INFO)
 
     # Pin configuration
-    output_line.request(consumer="RPi-Teensy", type=gpiod.LINE_REQ_DIR_OUT)
-    input_line.request(consumer="RPi-Teensy", type=gpiod.LINE_REQ_EV_BOTH_EDGES)
+    ch_change_line.request(consumer="RPi-Teensy", type=gpiod.LINE_REQ_DIR_OUT)
+    output_lines.request(consumer="RPi-Teensy", type=gpiod.LINE_REQ_EV_BOTH_EDGES)
     
 
 ###############################################################################
@@ -255,14 +255,19 @@ def run_measurement():
     print("Raspberry Pi: Function completed. Sending acknowledgment to Teensy.")
 
     # Send short pulse as acknowledgement signal to Teensy
-    output_line.set_value(1)
+    ch_change_line.set_value(1)
     time.sleep(1)
-    output_line.set_value(0)
+    ch_change_line.set_value(0)
 
 # Function to execute when Teensy acknowledgment is received
-def teensy_acknowledged():
+def teensy_ch_change_acknowledged():
     print("Raspberry Pi: Received acknowledgment from Teensy.")
     run_measurement()
+
+def teensy_cycle_acknowledged():
+    print("Raspberry Pi: Received cycle acknowledgment from Teensy. Exiting after final measurement.")
+    run_measurement()
+    sys.exit(0)
     
 # Listens for signal from Teensy, then runs measurement
 def main():
@@ -271,19 +276,22 @@ def main():
         run_measurement()
         while True:
             # Wait for an edge event (blocking wait with timeout of 10 seconds)
-            event = input_line.event_wait()
-            if event:
+            if output_lines.event_wait():
                 # Process the edge event
-                event_details = input_line.event_read()
-                if event_details.type == gpiod.LineEvent.RISING_EDGE:
-                    teensy_acknowledged()
+                events = output_lines.event_read()
+                for event in events:
+                    if event.type == gpiod.LineEvent.RISING_EDGE:
+                        if event.offset == CH_CHANGE_ACK_PIN:
+                            teensy_ch_change_acknowledged()
+                        elif event.offset == CYCLE_ACK_PIN:
+                            teensy_cycle_acknowledged()
 
             # Keep the program running indefinitely
             time.sleep(1)
             
     finally:
-        output_line.release()
-        input_line.release()
+        ch_change_line.release()
+        output_lines.release()
 
 
 if __name__ == '__main__':
