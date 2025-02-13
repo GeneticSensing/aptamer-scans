@@ -186,4 +186,9 @@ The same software and hardware setup for the full SWV measurements is required f
     - To compile the `.ino` file to a `.hex` file, run this command with Arduino CLI installed. `arduino-cli compile --fqbn teensy:avr:teensy40 --output-dir swv_scripts/teensy/swv_mux swv_scripts/teensy/swv_mux/swv_mux.ino`
     - Then load the `HEX` file onto the Teensy using Teensyloader CLI. `teensy_loader_cli --mcu=TEENSY40 -w swv_scripts/teensy/swv_mux/swv_mux.ino.hex`
 3. Install `sudo apt install python3-libgpiod`
-4. The RPi **must** but used. The `RPi.GPIO` library enables communication between RPi and Teensy GPIO pins.
+4. The RPi **must** but used. The `libgpiod` library enables communication between RPi and Teensy GPIO pins.
+
+### How it should run
+Reboot the Teensy, then run `python3 -m advanced_swv_teensy` inside the virtual env. The teensy will initiate and switch to the first MUX channel. The RPi then signals the potentiostat to run the experiment, taking samples from the electrode connected to the selected MUX channel. Once the measurement is completed, the RPi saves data from the measurement and send a signal to the Teensy to switch to the next MUX channel. Once the Teensy completes the switch, it signals the RPi to continue with the next experiment. This continues until all measurements are completed (a full cycle), in which the Teensy will send a signal to stop running more measurements.
+
+`arduino-cli monitor -p /dev/ttyACM0` to open the Serial monitor for the Teensy for debugging.
