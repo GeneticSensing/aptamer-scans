@@ -1,145 +1,131 @@
 /*
-  Blink
+  MUX Channel Switching with Teensy and Raspberry Pi
 
-  Turns an LED on for one second, then off for one second, repeatedly.
+  This program interfaces with a Teensy microcontroller to control an ADG731 multiplexer (MUX).
+  It listens for a signal from a Raspberry Pi to change the MUX channel and acknowledges each change.
 
-  Most Arduinos have an on-board LED you can control. On the UNO, MEGA and ZERO
-  it is attached to digital pin 13, on MKR1000 on pin 6. LED_BUILTIN is set to
-  the correct LED pin independent of which board is used.
-  If you want to know what pin the on-board LED is connected to on your Arduino
-  model, check the Technical Specs of your board at:
-  https://www.arduino.cc/en/Main/Products
-
-  modified by 12 Feb 2025
+  Modified by 12 Feb 2025
   by Sadman Sakib, Adam Mak
 */
 
-// include the SPI and Bounce libraries
-#include <SPI.h> 
-#include <Bounce.h>
+#include <SPI.h>
 
-// Raspberry Pi Communication Pins
-// Teensy IN::used to command teensy to change MUX channel
-const int chChangePin = 18; 
-// Teensy OUT:: used to acknowledge channel change
-const int chChangeAckPin = 19; 
-// Teensy OUT:: used to achnowledge finishing of full electrode change cycle
-const int cycleAckPin = 20; 
+// RPi Communication Pins
+#define CH_CHANGE_PIN      18  // Teensy IN: Command to change MUX channel
+#define CH_CHANGE_ACK_PIN  19  // Teensy OUT: Acknowledge channel change
+#define CYCLE_ACK_PIN      20  // Teensy OUT: Acknowledge full electrode change cycle
 
-// slave select Pins used in 3-wire SPI communication
-// SYNC signals for the ADG731 MUX chips
-const int selectPin1 = 9;
-// SPI settings -> frequency, significant bit polarity and mode
-SPISettings spiconfig(30000000, MSBFIRST, SPI_MODE2);
+// SPI Slave Select Pin
+#define SELECT_PIN1        9   // SYNC signal for the ADG731 MUX
 
-// ADG731 SPI channel select addresses
-// MSB:: !EN !CS X A4 A3 A2 A1 A0 :: LSB
-const byte chnls[] = {
+// SPI Configuration
+#define SPI_FREQUENCY      30000000
+#define SPI_BIT_ORDER      MSBFIRST
+#define SPI_MODE           SPI_MODE2
+SPISettings spiConfig(SPI_FREQUENCY, SPI_BIT_ORDER, SPI_MODE);
+
+// ADG731 SPI Channel Select Addresses (MSB:: !EN !CS X A4 A3 A2 A1 A0 :: LSB)
+const byte CHANNELS[] = {
   0b00011111,  // 32
   0b00011110,  // 31
   0b00011101,  // 30
   0b00011100,  // 29
   0b00011011,  // 28
-  0b00011010,  // 27 
+  0b00011010,  // 27
   0b00011001,  // 26
   0b00011000   // 25
 };
-// All switches off
-const byte muxChipOff = 0b1000000;
-// Retain previous switch condition
-const byte keepChnl = 0b01000000;
 
-int chnlIndex = 0;
-const int totalChnls = 8;
+#define TOTAL_CHANNELS 8
+#define MUX_OFF        0b1000000  // All switches off
+#define KEEP_CHANNEL   0b01000000 // Retain previous switch condition
 
-volatile bool triggerFunction = false;  // Flag to indicate interrupt occurred
+volatile bool triggerFunction = false;  // Flag to indicate interrupt occurrence
+int channelIndex = 0; // Current channel index
 
-// ISR for when signal is received
+// Interrupt Service Routine (ISR) for channel change signal
 void handleInterrupt() {
   triggerFunction = true;
 }
 
+// Latch function to retain the previous switch condition
 void latch() {
-  SPI.beginTransaction(spiconfig);
-  digitalWrite(selectPin1, LOW);
-  SPI.transfer(keepChnl);
-  digitalWrite(selectPin1, HIGH);
+  SPI.beginTransaction(spiConfig);
+  digitalWrite(SELECT_PIN1, LOW);
+  SPI.transfer(KEEP_CHANNEL);
+  digitalWrite(SELECT_PIN1, HIGH);
   SPI.endTransaction();
 }
 
-// the setup function runs once when you press reset or power the board
-void setup() {
-
-  // Raspberry Pi Communication Pins
-  pinMode(chChangePin, INPUT);
-  pinMode(chChangeAckPin, OUTPUT);
-  pinMode(cycleAckPin, OUTPUT);
-
-  // set slave select pins as outputs
-  pinMode(selectPin1, OUTPUT);
-
-  // initiate MUX channel switch when receiving pulse from RPi
-  attachInterrupt(digitalPinToInterrupt(chChangePin), handleInterrupt, RISING);
-
-  // initialize SPI and Serial communication
-  SPI.begin();
-  Serial.begin(38400);
-
-  // initialize MUX to first channel
-  SPI.beginTransaction(spiconfig);
-  digitalWrite(selectPin1, LOW);
-  SPI.transfer(chnls[chnlIndex]);
-  digitalWrite(selectPin1, HIGH);
+// Switch MUX channel
+void switchChannel(int channel) {
+  SPI.beginTransaction(spiConfig);
+  digitalWrite(SELECT_PIN1, LOW);
+  SPI.transfer(CHANNELS[channel]);
+  digitalWrite(SELECT_PIN1, HIGH);
   SPI.endTransaction();
-
-  latch();
 }
 
-// the loop function runs over and over again forever
-void loop() {
-
-  // check to see if the pushbutton has been pressed
-  // commands Teensy to change MUX channel
-  if (triggerFunction) {
-    triggerFunction = false;  // reset the flag
-    Serial.println("Teensy: Sending instruction to MUX");
-
-    chnlIndex = (chnlIndex + 1) % totalChnls;  // Cycle through channels
-
-    SPI.beginTransaction(spiconfig);
-    digitalWrite(selectPin1, LOW);
-    SPI.transfer(chnls[chnlIndex]);  // send new chnl selection
-    digitalWrite(selectPin1, HIGH);
-    SPI.endTransaction();
-
-    if (chnlIndex == totalChnls - 1){
-      Serial.println("Teensy: Fulll cycle completed. Sending signal to RPi to finish.");
-      cycleCompleteAck();
-    } else {
-      Serial.println("Teensy: Completed. Sending signal to RPi to start next measurement.");
-      chnlChangeAck();
-    }
-    latch();
-  }
-}
-
-void chnlChangeAck() {
-  // Acknowledgement signal that MUX channel has been changed
-  // A 10s 3.3 V pulse -> RPi to detect rising edge
-  digitalWrite(chChangeAckPin, HIGH);
+// Acknowledgment signal that MUX channel has changed
+void channelChangeAck() {
+  digitalWrite(CH_CHANGE_ACK_PIN, HIGH);
   delay(10);
-  digitalWrite(chChangeAckPin, LOW);
-  Serial.println(chnlIndex);
+  digitalWrite(CH_CHANGE_ACK_PIN, LOW);
+  Serial.println(channelIndex);
   Serial.println("Channel Changed!");
   delay(1000);
 }
 
+// Acknowledgment signal that MUX has cycled through all available channels
 void cycleCompleteAck() {
-  // Acknowledgement signal that MUX has cycled through all available chnls
-  // A 10s 3.3 V pulse -> RPi to detect rising edge
-  digitalWrite(cycleAckPin, HIGH);
+  digitalWrite(CYCLE_ACK_PIN, HIGH);
   delay(10);
-  digitalWrite(cycleAckPin, LOW);
+  digitalWrite(CYCLE_ACK_PIN, LOW);
   Serial.println("Cycle Complete!");
   delay(1000);
+}
+
+void setup() {
+  // Initialize Raspberry Pi Communication Pins
+  pinMode(CH_CHANGE_PIN, INPUT);
+  pinMode(CH_CHANGE_ACK_PIN, OUTPUT);
+  pinMode(CYCLE_ACK_PIN, OUTPUT);
+
+  // Initialize SPI Slave Select Pin
+  pinMode(SELECT_PIN1, OUTPUT);
+
+  // Attach interrupt for channel change request
+  attachInterrupt(digitalPinToInterrupt(CH_CHANGE_PIN), handleInterrupt, RISING);
+
+  // Initialize SPI and Serial Communication
+  SPI.begin();
+  Serial.begin(38400);
+
+  // Initialize MUX to the first channel
+  switchChannel(0);
+
+  latch();
+}
+
+void loop() {
+  // Check if an interrupt has occurred
+  if (triggerFunction) {
+    triggerFunction = false;  // Reset the flag
+    Serial.println("Teensy: Sending instruction to MUX");
+
+    // Cycle through channels
+    channelIndex = (channelIndex + 1) % TOTAL_CHANNELS;
+
+    // Send new channel selection to MUX
+    switchChannel(channelIndex);
+
+    if (channelIndex == TOTAL_CHANNELS - 1) {
+      Serial.println("Teensy: Full cycle completed. Sending signal to RPi to finish last measurement.");
+      cycleCompleteAck();
+    } else {
+      Serial.println("Teensy: Completed. Sending signal to RPi to start next measurement.");
+      channelChangeAck();
+    }
+    latch();
+  }
 }
