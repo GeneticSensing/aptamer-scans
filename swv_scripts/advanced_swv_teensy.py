@@ -59,10 +59,12 @@ import logging
 import os
 import os.path
 import sys
+import time
 import typing
 
 # Third-party imports
 import matplotlib.pyplot as plt
+import gpiod
 
 # Local imports
 import palmsens.instrument
@@ -104,12 +106,32 @@ XAXIS_COLUMN_INDEX = 0
 # Indices of columns to put on the y axis. The variables must be same type.
 YAXIS_COLUMN_INDICES = [1, 2, 3]
 
+CH_CHANGE_PIN     = 11  # Pin 23 to send signal to Teensy
+CH_CHANGE_ACK_PIN = 8   # Pin 24 to receive signal from Teensy
+CYCLE_ACK_PIN     = 7   # Pin 26 to receive signal from Teensy
+chip = gpiod.Chip('gpiochip4')
+ch_change_line = chip.get_line(CH_CHANGE_PIN)
+output_lines = chip.get_lines([CH_CHANGE_ACK_PIN, CYCLE_ACK_PIN])
+
+LOG = logging.getLogger(__name__)
+
+def setup():
+    # Configure the logging.
+    logging.basicConfig(level=logging.DEBUG, format='[%(module)s] %(message)s', stream=sys.stdout)
+    # Uncomment the following line to reduce the log level of our library.
+    # logging.getLogger('palmsens').setLevel(logging.INFO)
+    # Disable excessive logging from matplotlib.
+    logging.getLogger('matplotlib').setLevel(logging.INFO)
+    logging.getLogger('PIL.PngImagePlugin').setLevel(logging.INFO)
+
+    # Pin configuration
+    ch_change_line.request(consumer="RPi-Teensy", type=gpiod.LINE_REQ_DIR_OUT)
+    output_lines.request(consumer="RPi-Teensy", type=gpiod.LINE_REQ_EV_BOTH_EDGES)
+    
+
 ###############################################################################
 # End of configuration
 ###############################################################################
-
-
-LOG = logging.getLogger(__name__)
 
 
 def write_curves_to_csv(file: typing.IO, curves: list[list[list[palmsens.mscript.MScriptVar]]]):
@@ -142,16 +164,9 @@ def write_curves_to_csv(file: typing.IO, curves: list[list[list[palmsens.mscript
             writer.writerow([value.value for value in package])
 
 
-def main():
+def run_measurement():
     """Run the example."""
-    # Configure the logging.
-    logging.basicConfig(level=logging.DEBUG, format='[%(module)s] %(message)s',
-                        stream=sys.stdout)
-    # Uncomment the following line to reduce the log level of our library.
-    # logging.getLogger('palmsens').setLevel(logging.INFO)
-    # Disable excessive logging from matplotlib.
-    logging.getLogger('matplotlib').setLevel(logging.INFO)
-    logging.getLogger('PIL.PngImagePlugin').setLevel(logging.INFO)
+    print("Raspberry Pi: Running SWV measurement...")
 
     # Determine unique name for plot and files.
     base_name = datetime.datetime.now().strftime('ms_plot_swv_%Y%m%d-%H%M%S')
@@ -234,9 +249,49 @@ def main():
 
     # Generate legend.
     plt.legend()
-
     plt.savefig(base_path + '.png')
-    plt.show()
+    plt.close()
+
+    print("Raspberry Pi: Function completed. Sending acknowledgment to Teensy.")
+
+    # Send short pulse as acknowledgement signal to Teensy
+    ch_change_line.set_value(1)
+    time.sleep(1)
+    ch_change_line.set_value(0)
+
+# Function to execute when Teensy acknowledgment is received
+def teensy_ch_change_acknowledged():
+    print("Raspberry Pi: Received acknowledgment from Teensy.")
+    run_measurement()
+
+def teensy_cycle_acknowledged():
+    print("Raspberry Pi: Received cycle acknowledgment from Teensy. Exiting after final measurement.")
+    run_measurement()
+    sys.exit(0)
+    
+# Listens for signal from Teensy, then runs measurement
+def main():
+    try:
+        setup()
+        run_measurement()
+        while True:
+            # Wait for an edge event (blocking wait with timeout of 10 seconds)
+            if output_lines.event_wait():
+                # Process the edge event
+                events = output_lines.event_read()
+                for event in events:
+                    if event.type == gpiod.LineEvent.RISING_EDGE:
+                        if event.offset == CH_CHANGE_ACK_PIN:
+                            teensy_ch_change_acknowledged()
+                        elif event.offset == CYCLE_ACK_PIN:
+                            teensy_cycle_acknowledged()
+
+            # Keep the program running indefinitely
+            time.sleep(1)
+            
+    finally:
+        ch_change_line.release()
+        output_lines.release()
 
 
 if __name__ == '__main__':
