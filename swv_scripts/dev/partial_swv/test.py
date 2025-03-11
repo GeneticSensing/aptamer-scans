@@ -6,8 +6,8 @@ from io import StringIO
 from scipy.signal import butter, filtfilt
 
 # CSV path
-SWV_CSV_PATH = 'ms_plot_swv_100hz_emstat4.csv'
-PARTIAL_SWV_CSV_PATH = 'ms_plot_partial_swv_100hz_emstat4.csv'
+SWV_CSV_PATH = 'full3.csv'
+PARTIAL_SWV_CSV_PATH = 'partial3.csv'
 
 
 """
