@@ -177,10 +177,10 @@ class ScanTracker:
     peak = self.data["peak"]
     # Determine scanning windows
     return {
-      "<E_begin_baseline>": f"{int(left_baseline*1000) - 30}m",
-      "<E_end_baseline>": f"{int(left_baseline*1000)}m",
-      "<E_begin_peak>": f"{int(peak*1000) - 15}m",
-      "<E_end_peak>": f"{int(peak*1000) + 15}m"
+      "<E_begin_baseline>": f"{int(left_baseline*1000)}m",
+      "<E_end_baseline>": f"{int(left_baseline*1000) - 30}m",
+      "<E_begin_peak>": f"{int(peak*1000) + 15}m",
+      "<E_end_peak>": f"{int(peak*1000) - 15}m"
     }
 
 

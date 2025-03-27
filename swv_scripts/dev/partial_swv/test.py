@@ -6,8 +6,8 @@ from io import StringIO
 from scipy.signal import butter, filtfilt
 
 # CSV path
-SWV_CSV_PATH = 'full1.csv'
-PARTIAL_SWV_CSV_PATH = 'partial1.csv'
+SWV_CSV_PATH = 'full_5mM.csv'
+PARTIAL_SWV_CSV_PATH = 'partial_5mM.csv'
 
 """
 Converts measurement to a dataframe
