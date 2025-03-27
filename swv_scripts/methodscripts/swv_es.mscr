@@ -5,7 +5,7 @@ var f
 var g
 set_pgstat_chan 1
 set_pgstat_mode 0
-set_pgstat_chan 1
+set_pgstat_chan 0
 set_pgstat_mode 3
 set_max_bandwidth 4k
 set_range_minmax da -450m 50m
@@ -22,6 +22,9 @@ meas_loop_swv p c f g 0 -400m 1m 50m 5
 	pck_add g
 	pck_end
 endloop
+cell_off
+wait 1
+cell_on
 # Run SWV
 meas_loop_swv p c f g 0 -400m 1m 50m 100
 	pck_start

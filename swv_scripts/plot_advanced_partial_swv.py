@@ -130,15 +130,15 @@ def find_peak_and_baseline(x: np.ndarray, y: np.ndarray) -> typing.Tuple[float, 
   prominence_threshold = 5e-7
   distance_threshold = 100
 
-  peaks, properties = sg.find_peaks(y, prominence=prominence_threshold, distance=distance_threshold)
+  peaks, properties = sg.find_peaks(-y, prominence=prominence_threshold, distance=distance_threshold)
   if len(peaks) == 0:
     raise ValueError("No peak found! Please recalibrate.")
   if len(peaks) > 1:
     print("More than one peak found!")
     # Return peak with the max current
     i_max_peak = max(range(len(peaks)), key=lambda i: y[peaks[i]])
-    return x[peaks[i_max_peak]], x[properties['left_bases'][i_max_peak]]
-  return x[peaks[0]], x[properties['left_bases'][0]]
+    return x[peaks[i_max_peak]], x[properties['right_bases'][i_max_peak]]
+  return x[peaks[0]], x[properties['right_bases'][0]]
   
 
 class ScanTracker:
@@ -177,10 +177,10 @@ class ScanTracker:
     peak = self.data["peak"]
     # Determine scanning windows
     return {
-      "<E_begin_baseline>": f"{int(left_baseline*1000)}m",
-      "<E_end_baseline>": f"{int(left_baseline*1000) - 30}m",
-      "<E_begin_peak>": f"{int(peak*1000) + 15}m",
-      "<E_end_peak>": f"{int(peak*1000) - 15}m"
+      "<E_begin_baseline>": f"{int(left_baseline*1000) + 30}m",
+      "<E_end_baseline>": f"{int(left_baseline*1000)}m",
+      "<E_begin_peak>": f"{int(peak*1000) + 30}m",
+      "<E_end_peak>": f"{int(peak*1000) - 30}m"
     }
 
 
