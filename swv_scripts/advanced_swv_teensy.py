@@ -105,6 +105,8 @@ COLUMN_NAMES = ['Potential', 'Current', 'Forward Current', 'Reverse Current']
 XAXIS_COLUMN_INDEX = 0
 # Indices of columns to put on the y axis. The variables must be same type.
 YAXIS_COLUMN_INDICES = [1, 2, 3]
+# Peak has a blip during first couple of scanning points, so we ignore them.
+CATHODE_SPIKE_OFFSET = 2
 
 CH_CHANGE_PIN     = 11  # Pin 23 to send signal to Teensy
 CH_CHANGE_ACK_PIN = 8   # Pin 24 to receive signal from Teensy
@@ -245,7 +247,7 @@ def run_measurement():
                 label += f' {icurve}'
 
             # Plot the curve y axis against the global x axis.
-            plt.plot(xvalues, yvalues, label=label)
+            plt.plot(xvalues[CATHODE_SPIKE_OFFSET:], yvalues[CATHODE_SPIKE_OFFSET:], label=label)
 
     # Generate legend.
     plt.legend()

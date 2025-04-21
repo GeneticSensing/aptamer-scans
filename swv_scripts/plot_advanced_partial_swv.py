@@ -41,7 +41,7 @@ LOG = logging.getLogger(__name__)
 DEVICE_PORT = None
 
 # Location of MethodSCRIPT file to use.
-SWV_ES_PATH = 'methodscripts/swv_es.mscr'
+SWV_ES_PATH = 'methodscripts/swv_es_calibration.mscr'
 PARTIAL_SWV_ES_TEMPLATE_PATH = 'methodscripts/partial_swv_es_template.mscr'
 PARTIAL_SWV_ES_PATH = 'methodscripts/partial_swv_es.mscr'
 
@@ -55,7 +55,7 @@ XAXIS_COLUMN_INDEX = 0
 # Indices of columns to put on the y axis. The variables must be same type.
 YAXIS_COLUMN_INDICES = [1, 2, 3]
 
-N = 10  # Every Nth scan is a calibration scan
+N = 2  # Every Nth scan is a calibration scan
 
 ### End of configuration
 
@@ -127,10 +127,10 @@ def butterworth_filter(signal: np.ndarray) -> np.ndarray:
 
 def find_peak_and_baseline(x: np.ndarray, y: np.ndarray) -> typing.Tuple[float, float]:
   # Parameters
-  prominence_threshold = 5e-7
+  prominence_threshold = 1e-9
   distance_threshold = 100
 
-  peaks, properties = sg.find_peaks(y, prominence=prominence_threshold, distance=distance_threshold)
+  peaks, properties = sg.find_peaks(-y, prominence=prominence_threshold, distance=distance_threshold)
   if len(peaks) == 0:
     raise ValueError("No peak found! Please recalibrate.")
   if len(peaks) > 1:
@@ -164,8 +164,8 @@ class ScanTracker:
     yvalues_filtered = butterworth_filter(yvalues)
     # Get all samples where -0.4 mV <= applied potential >= -0.05 mV
     start, end = np.searchsorted(xvalues, [-0.4, -0.05])
-    trunc_x = xvalues[start:end]
-    trunc_y = yvalues_filtered[start:end]
+    trunc_x = xvalues[end:start]
+    trunc_y = yvalues_filtered[end:start]
     peak, baseline = find_peak_and_baseline(trunc_x, trunc_y)
     self.data["peak"] = peak
     self.data["left_baseline"] = baseline
@@ -177,10 +177,10 @@ class ScanTracker:
     peak = self.data["peak"]
     # Determine scanning windows
     return {
-      "<E_begin_baseline>": f"{int(left_baseline*1000) - 30}m",
+      "<E_begin_baseline>": f"{int(left_baseline*1000) + 30}m",
       "<E_end_baseline>": f"{int(left_baseline*1000)}m",
-      "<E_begin_peak>": f"{int(peak*1000) - 15}m",
-      "<E_end_peak>": f"{int(peak*1000) + 15}m"
+      "<E_begin_peak>": f"{int(peak*1000) + 30}m",
+      "<E_end_peak>": f"{int(peak*1000) - 30}m"
     }
 
 
@@ -226,7 +226,7 @@ def plot_curves(curves: list[list[list[palmsens.mscript.MScriptVar]]], base_path
         plt.plot(xvalues, yvalues, color=color, label=label)
         continue
       # Standard single plot for calibration
-      elif icurve == 1 and iy_axis == 0:
+      elif icurve == 0 and iy_axis == 0:
         # Determine peak and baseline for subsequent partial scans
         yvalues = scan_tracker.update_peak_values(xvalues, yvalues)
       plt.plot(xvalues, yvalues, label=label)

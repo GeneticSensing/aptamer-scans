@@ -6,9 +6,8 @@ from io import StringIO
 from scipy.signal import butter, filtfilt
 
 # CSV path
-SWV_CSV_PATH = 'ms_plot_swv_100hz_emstat4.csv'
-PARTIAL_SWV_CSV_PATH = 'ms_plot_partial_swv_100hz_emstat4.csv'
-
+SWV_CSV_PATH = '2nd_e/full9.csv'
+PARTIAL_SWV_CSV_PATH = '2nd_e/partial9.csv'
 
 """
 Converts measurement to a dataframe
@@ -54,9 +53,12 @@ def filter(signal: np.ndarray, cutoff_frequency: float) -> np.ndarray:
 
 
 def display(dfs: list[pd.DataFrame], names: list[str]):
+  CATHODE_SPIKE_OFFSET = 2
   plt.figure()
   for i in range(len(dfs)):
-    plt.plot(dfs[i].iloc[:, 0], dfs[i].iloc[:, 1], label=names[i])
+    potentials = dfs[i].iloc[CATHODE_SPIKE_OFFSET:, 0]
+    currents = dfs[i].iloc[CATHODE_SPIKE_OFFSET:, 1]
+    plt.plot(potentials, currents, label=names[i])
   plt.xlabel('Applied Potential [V]')
   plt.ylabel('Current [A]')
   plt.title('Full and Partial SWV with EmStat4')
@@ -69,8 +71,6 @@ def main():
   names = []
 
   dfs.append(convert_csv_to_df(SWV_CSV_PATH, 0))
-  names.append("Cell Off")
-  dfs.append(convert_csv_to_df(SWV_CSV_PATH, 1))
   names.append("Cell On")
   dfs.append(convert_csv_to_df(PARTIAL_SWV_CSV_PATH, 0))
   names.append("Cell Off (baseline)")
