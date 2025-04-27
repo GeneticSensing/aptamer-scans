@@ -48,6 +48,21 @@ For running experiments:
 
 ---
 
+## First time - Prerequisite steps
+
+**Clone repo**  
+Open up terminal and execute the following command
+```bash
+git clone https://github.com/GeneticSensing/aptamer-scans
+```
+
+**Retrieve new changes**  
+Open up terminal and execute the following command
+```bash
+cd aptamer-scans
+git pull
+```
+
 ## Setting up the Environment
 _Note_: If using Windows computer, setting up a virtual environment is not required, although still recommended. MacOS doesn't support MethodSCRIPT devices.
 1. **Change to repo directory**:  
@@ -55,37 +70,41 @@ _Note_: If using Windows computer, setting up a virtual environment is not requi
     ```bash
     cd aptamer-scans
     ```
-1. **Install gpiod**:  
+2. **Install gpiod**:  
   `gpiod` needs to be installed globally (for whatever reason).
     ```bash
     sudo apt install python3-libgpiod
     ```
-2. **Create a virtual environment**:  
+3. **Create a virtual environment**:  
   `my-venv` can be any arbitrary name. System site packages is used to inherit global packages.
     ```bash
     python3 -m venv --system-site-packages my-venv
     ```
 
-3. **Activate the virtual environment**:  
+4. **Activate the virtual environment**:  
     ```bash
     source my-venv/bin/activate
     ```
 
-4. **Install required packages**:  
+5. **Install required packages**:  
   Use the `requirements.txt` file to install dependencies:
     ```bash
     pip3 install -r requirements.txt
     ```
 
-5. **Run the script as a module**:  
+6. **Run the script as a module**:  
   For single scans, execute
     ```bash
-    python3 -m plot_advanced_partial_swv
+    python3 -m plot_swv <cntr>
     ```
+    Where \<cntr> should be replaced by a positive integer that will be used to uniquely identify a scan under `output/`.
+
     To run an experiment, execute
     ```bash
     python3 -m swv
     ```
+
+If virtual environment already created (have gone through this at least once), then only have to go through steps 1, 4, and 6.
 
 ### Setting up Physical Environment
 
