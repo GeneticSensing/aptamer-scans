@@ -3,3 +3,6 @@
 
 # Ignore caches
 __pycache__
+
+# Ignore python bytecode
+tox.ini
