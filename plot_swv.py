@@ -66,7 +66,6 @@ Curve = list[list[palmsens.mscript.MScriptVar]]
 ### Constants ###
 
 LOG = logging.getLogger(__name__)
-DEVICE_PORT = None # (None = auto detect).
 # Paths
 CALIBRATION_SWV_PATH = 'methodscripts/swv_calibration.mscr'
 PARTIAL_SWV_PATH_PREFIX = 'methodscripts/partial_swv_'
@@ -156,10 +155,10 @@ def find_peak_and_baseline(potentials: np.ndarray, currents: np.ndarray) -> tupl
   # TODO: Apply baseline correction
   peaks, properties = sg.find_peaks(-trunc_y, prominence=prominence_threshold, distance=distance_threshold)
   if len(peaks) == 0:
-    print("No peak found! Please recalibrate.")
+    LOG.warning("No peak found! Please recalibrate.")
     return 0, 0 # TODO: Use next WE to find peak
   if len(peaks) > 1:
-    print("More than one peak found!")
+    LOG.info("More than one peak found!")
     # Return peak with the max current
     i_max_peak = min(range(len(peaks)), key=lambda i: trunc_y[peaks[i]])
     return trunc_x[peaks[i_max_peak]], trunc_x[properties['left_bases'][i_max_peak]]
@@ -217,15 +216,12 @@ def perform_partial_scans(device: Instrument, peak: float, baseline: float) -> C
 
 def concat_partial_scans(previous_scans: Curve, new_scan: Curve) -> Curve:
   a = np.asarray(previous_scans)
-  b = np.asarray(new_scan)[:, 1:] # Exclude the redundant potential column
+  b = np.asarray(new_scan)
   return np.concatenate((a, b), axis=1).tolist()
 
-def perform_scan(elctrd_cntr: int):
+def perform_scan():
   LOG.info(f"Starting partial SWV scan including calibration scan.")
-  port = DEVICE_PORT
-  if port is None:
-    port = palmsens.serial.auto_detect_port()
-
+  port = palmsens.serial.auto_detect_port()
   # Create and open serial connection to the device.
   with palmsens.serial.Serial(port, 1) as comm:
     device = Instrument(comm)
@@ -256,10 +252,10 @@ def plot_curve(partial_scans: Curve, calibration_scan: Curve):
   yvalues = palmsens.mscript.get_values_by_column([calibration_scan], 1)
   plt.plot(xvalues, yvalues, label='Calibration Scan 100Hz', color='black')
   # Loop through all partial scans
-  xvalues = palmsens.mscript.get_values_by_column([partial_scans], 0)
-  for y_axis in range(1, len(partial_scans[0])):
-    yvalues = palmsens.mscript.get_values_by_column([partial_scans], y_axis)
-    label = partial_scans[0][y_axis].type.name
+  for i in range(0, len(partial_scans), 2):
+    xvalues = palmsens.mscript.get_values_by_column([partial_scans], i)
+    yvalues = palmsens.mscript.get_values_by_column([partial_scans], i+1)
+    label = partial_scans[0][i+1].type.name
     plt.plot(xvalues, yvalues, label=label)
   # Display the legend and save the plot
   plt.legend()
@@ -270,8 +266,7 @@ def plot_curve(partial_scans: Curve, calibration_scan: Curve):
 
 def main():
   setup()
-  perform_scan(elctrd_cntr)
+  perform_scan()
 
 if __name__ == '__main__':
   main()
-
