@@ -114,10 +114,10 @@ def write_curve_to_csv(file: typing.IO, curve: Curve):
 
 def get_replacements(peak: float, left_baseline: float) -> dict[str, str]:
   return {
-    "<E_begin_baseline>": f"{int(left_baseline*1000) - 30}m",
-    "<E_end_baseline>": f"{int(left_baseline*1000)}m",
-    "<E_begin_peak>": f"{int(peak*1000) - 15}m",
-    "<E_end_peak>": f"{int(peak*1000) + 15}m"
+    "<E_begin_baseline>": f"{int(left_baseline*1000)}m",
+    "<E_end_baseline>": f"{int(left_baseline*1000) - 30}m",
+    "<E_begin_peak>": f"{int(peak*1000) + 15}m",
+    "<E_end_peak>": f"{int(peak*1000) - 15}m"
   }
 
 def update_method_script(template_path: str, dest_path: str, replacements: dict):
@@ -252,7 +252,7 @@ def plot_curve(partial_scans: Curve, calibration_scan: Curve):
   yvalues = palmsens.mscript.get_values_by_column([calibration_scan], 1)
   plt.plot(xvalues, yvalues, label='Calibration Scan 100Hz', color='black')
   # Loop through all partial scans
-  for i in range(0, len(partial_scans), 2):
+  for i in range(0, len(partial_scans[0]), 2):
     xvalues = palmsens.mscript.get_values_by_column([partial_scans], i)
     yvalues = palmsens.mscript.get_values_by_column([partial_scans], i+1)
     label = partial_scans[0][i+1].type.name
