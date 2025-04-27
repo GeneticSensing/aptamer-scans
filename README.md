@@ -70,29 +70,16 @@ _Note_: If using Windows computer, setting up a virtual environment is not requi
     ```bash
     cd aptamer-scans
     ```
-2. **Install gpiod**:  
-  `gpiod` needs to be installed globally (for whatever reason).
-    ```bash
-    sudo apt install python3-libgpiod
-    ```
-3. **Create a virtual environment**:  
-  `my-venv` can be any arbitrary name. System site packages is used to inherit global packages.
-    ```bash
-    python3 -m venv --system-site-packages my-venv
-    ```
-
-4. **Activate the virtual environment**:  
-    ```bash
-    source my-venv/bin/activate
-    ```
-
-5. **Install required packages**:  
-  Use the `requirements.txt` file to install dependencies:
-    ```bash
-    pip3 install -r requirements.txt
-    ```
-
-6. **Run the script as a module**:  
+2. **Setup**
+  If setting up the env for the first time, run
+  ```bash
+  source setup.sh
+  ```
+  Otherwise, run
+  ```bash
+  source my-venv/bin/activate
+  ```
+3. **Run the script as a module**:  
   For single scans, execute
     ```bash
     python3 -m plot_swv <cntr>
@@ -102,9 +89,6 @@ _Note_: If using Windows computer, setting up a virtual environment is not requi
     To run an experiment, execute
     ```bash
     python3 -m swv
-    ```
-
-If virtual environment already created (have gone through this at least once), then only have to go through steps 1, 4, and 6.
 
 ### Setting up Physical Environment
 
