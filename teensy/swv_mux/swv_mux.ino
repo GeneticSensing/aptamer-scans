@@ -4,7 +4,7 @@
   This program interfaces with a Teensy microcontroller to control an ADG731 multiplexer (MUX).
   It listens for a signal from a Raspberry Pi to change the MUX channel and acknowledges each change.
 
-  Modified by 12 Feb 2025
+  Modified by 21 Feb 2025
   by Sadman Sakib, Adam Mak
 */
 
@@ -12,7 +12,8 @@
 
 // RPi Communication Pins
 #define CH_CHANGE_PIN      18  // Teensy IN: Command to change MUX channel
-#define CH_CHANGE_ACK_PIN  19  // Teensy OUT: Acknowledge channel change
+#define WE_CHANGE_ACK_PIN  21  // Teensy OUT: Acknowledge working electrode change
+#define CH_CHANGE_ACK_PIN  19  // Teensy OUT: Acknowledge chip change
 #define CYCLE_ACK_PIN      20  // Teensy OUT: Acknowledge full electrode change cycle
 
 // SPI Slave Select Pin
@@ -23,6 +24,10 @@
 #define SPI_BIT_ORDER      MSBFIRST
 #define SPI_MODE           SPI_MODE2
 SPISettings spiConfig(SPI_FREQUENCY, SPI_BIT_ORDER, SPI_MODE);
+
+// TODO: Modify data structure of channels to differentiate chips and their respective WE's from others.
+// Can probably use a map via 2D array with lookup as CHANNELS[chip_id][WE_id].
+// The map will be sparsely populated, but still efficient if each ID is only a byte long.
 
 // ADG731 SPI Channel Select Addresses (MSB:: !EN !CS X A4 A3 A2 A1 A0 :: LSB)
 const byte CHANNELS[] = {
@@ -57,6 +62,11 @@ void latch() {
   SPI.endTransaction();
 }
 
+// Switch WE
+void switchWE() {
+  ;
+}
+
 // Switch MUX channel
 void switchChannel(int channel) {
   SPI.beginTransaction(spiConfig);
@@ -66,28 +76,29 @@ void switchChannel(int channel) {
   SPI.endTransaction();
 }
 
-// Acknowledgment signal that MUX channel has changed
-void channelChangeAck() {
-  digitalWrite(CH_CHANGE_ACK_PIN, HIGH);
+void changeAck(int pin, char[] message) {
+  digitalWrite(pin, HIGH);
   delay(10);
-  digitalWrite(CH_CHANGE_ACK_PIN, LOW);
+  digitalWrite(pin, LOW);
   Serial.println(channelIndex);
-  Serial.println("Channel Changed!");
+  Serial.println(message);
   delay(1000);
 }
 
-// Acknowledgment signal that MUX has cycled through all available channels
-void cycleCompleteAck() {
-  digitalWrite(CYCLE_ACK_PIN, HIGH);
+// Acknowledgment signal that WE has changed
+void weChangeAck() {
+  digitalWrite(WE_CHANGE_ACK_PIN, HIGH);
   delay(10);
-  digitalWrite(CYCLE_ACK_PIN, LOW);
-  Serial.println("Cycle Complete!");
+  digitalWrite(WE_CHANGE_ACK_PIN, LOW);
+  Serial.println(channelIndex);
+  Serial.println("WE Changed!");
   delay(1000);
 }
 
 void setup() {
   // Initialize Raspberry Pi Communication Pins
   pinMode(CH_CHANGE_PIN, INPUT);
+  pinMode(WE_CHANGE_ACK_PIN, OUTPUT);
   pinMode(CH_CHANGE_ACK_PIN, OUTPUT);
   pinMode(CYCLE_ACK_PIN, OUTPUT);
 
@@ -112,19 +123,22 @@ void loop() {
   if (triggerFunction) {
     triggerFunction = false;  // Reset the flag
     Serial.println("Teensy: Sending instruction to MUX");
-
     // Cycle through channels
     channelIndex = (channelIndex + 1) % TOTAL_CHANNELS;
-
     // Send new channel selection to MUX
     switchChannel(channelIndex);
 
+    // TODO: Add logic to figure out if chip has been changed
+    // If not, send WE change signal, otherwise send chip/channel change signal
+    
     if (channelIndex == TOTAL_CHANNELS - 1) {
+      // Acknowledgment signal that MUX has cycled through all available WE's and chips
       Serial.println("Teensy: Full cycle completed. Sending signal to RPi to finish last measurement.");
-      cycleCompleteAck();
+      changeAck(CYCLE_ACK_PIN, "Cycle Completed!");
     } else {
+      // Acknowledgment signal that the chip has changed
       Serial.println("Teensy: Completed. Sending signal to RPi to start next measurement.");
-      channelChangeAck();
+      changeAck(CH_CHANGE_ACK_PIN, "Channel Changed!");
     }
     latch();
   }

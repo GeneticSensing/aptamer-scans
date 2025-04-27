@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Spin-off from PalmSens advanced SWV MethodSCRIPT example (plot_advanced_swv.py)
+Spin-off from PalmSens advanced SWV MethodSCRIPT example (advanced_swv_teensy.py)
 
 This script keeps a tally of scans. Every 10 scans including the first scan,
 a calibration scan is performed, which is just a full SWV scan.
@@ -20,9 +20,11 @@ import logging
 import os
 import os.path
 import sys
+import time
 import typing
 
 # Third-party imports
+import gpiod # unavailable on non-linux systems
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal as sg
@@ -41,7 +43,7 @@ LOG = logging.getLogger(__name__)
 DEVICE_PORT = None
 
 # Location of MethodSCRIPT file to use.
-SWV_ES_PATH = 'methodscripts/swv_es_calibration.mscr'
+SWV_ES_PATH = 'methodscripts/swv_es.mscr'
 PARTIAL_SWV_ES_TEMPLATE_PATH = 'methodscripts/partial_swv_es_template.mscr'
 PARTIAL_SWV_ES_PATH = 'methodscripts/partial_swv_es.mscr'
 
@@ -55,7 +57,60 @@ XAXIS_COLUMN_INDEX = 0
 # Indices of columns to put on the y axis. The variables must be same type.
 YAXIS_COLUMN_INDICES = [1, 2, 3]
 
-N = 2  # Every Nth scan is a calibration scan
+N = 10  # Every Nth scan is a calibration scan
+
+WE_CHANGE_ACK_PIN    = 25  # Pin 22 to send signal to Teensy
+CH_CHANGE_ACK_PIN    = 8   # Pin 24 to receive signal from Teensy
+CYCLE_CHANGE_ACK_PIN = 7   # Pin 26 to receive signal from Teensy
+CH_CHANGE_PIN        = 11  # Pin 23 to send signal to Teensy
+
+class ScanTracker:
+  """
+  Scan tracking data is persisted in scan_tracker.json
+  
+  Everytime an experiment completes, i.e. all scans completes, num_scans must be manually reset to 0
+  """
+  def __init__(self, file_path="scan_tracker.json"):
+    self.file_path = file_path
+    self.data = load_json(file_path)
+    self.device_type = None
+
+  def increment_scan(self):
+    self.data["num_scans"] += 1
+    save_json(self.data, self.file_path)
+
+  def is_calibration_scan(self):
+    return self.data["num_scans"] % N == 0
+
+  def update_peak_values(self, xvalues: np.ndarray, yvalues: np.ndarray):
+    # Filter data using butterworth
+    yvalues_filtered = butterworth_filter(yvalues)
+    # Get all samples where -0.4 mV <= applied potential >= -0.05 mV
+    start, end = np.searchsorted(xvalues, [-0.4, -0.05])
+    trunc_x = xvalues[start:end]
+    trunc_y = yvalues_filtered[start:end]
+    peak, baseline = find_peak_and_baseline(trunc_x, trunc_y)
+    self.data["peak"] = peak
+    self.data["left_baseline"] = baseline
+    save_json(self.data, self.file_path)
+    return yvalues_filtered
+
+  def get_replacements(self):
+    left_baseline = self.data["left_baseline"]
+    peak = self.data["peak"]
+    # Determine scanning windows
+    return {
+      "<E_begin_baseline>": f"{int(left_baseline*1000) - 30}m",
+      "<E_end_baseline>": f"{int(left_baseline*1000)}m",
+      "<E_begin_peak>": f"{int(peak*1000) - 15}m",
+      "<E_end_peak>": f"{int(peak*1000) + 15}m"
+    }
+
+# Globals
+chip = gpiod.Chip('gpiochip4')
+ch_change_line = chip.get_line(CH_CHANGE_PIN)
+output_lines = chip.get_lines([CH_CHANGE_ACK_PIN, CYCLE_CHANGE_ACK_PIN])
+scan_tracker = ScanTracker()
 
 ### End of configuration
 
@@ -80,10 +135,15 @@ def write_curves_to_csv(file: typing.IO, curves: list[list[list[palmsens.mscript
       writer.writerow([value.value for value in package])
 
 
-def configure_logging():
+def setup():
+  # Configure the logging.
   logging.basicConfig(level=logging.DEBUG, format='[%(module)s] %(message)s', stream=sys.stdout)
   logging.getLogger('matplotlib').setLevel(logging.INFO)
   logging.getLogger('PIL.PngImagePlugin').setLevel(logging.INFO)
+
+  # Pin configuration
+  ch_change_line.request(consumer="RPi-Teensy", type=gpiod.LINE_REQ_DIR_OUT)
+  output_lines.request(consumer="RPi-Teensy", type=gpiod.LINE_REQ_EV_BOTH_EDGES)
 
 
 def load_json(file_path: str) -> dict:
@@ -113,9 +173,9 @@ def update_method_script(template_path: str, dest_path: str, replacements: dict)
 
 def butterworth_filter(signal: np.ndarray) -> np.ndarray:
   # Parameters
-  sampling_rate = 100  # Hz
+  sampling_rate    = 100  # Hz
   cutoff_frequency = 2 # Hz
-  order = 3
+  order            = 3
 
   # Apply the filter
   nyquist = sampling_rate / 2
@@ -127,10 +187,10 @@ def butterworth_filter(signal: np.ndarray) -> np.ndarray:
 
 def find_peak_and_baseline(x: np.ndarray, y: np.ndarray) -> typing.Tuple[float, float]:
   # Parameters
-  prominence_threshold = 1e-9
+  prominence_threshold = 5e-7
   distance_threshold = 100
 
-  peaks, properties = sg.find_peaks(-y, prominence=prominence_threshold, distance=distance_threshold)
+  peaks, properties = sg.find_peaks(y, prominence=prominence_threshold, distance=distance_threshold)
   if len(peaks) == 0:
     raise ValueError("No peak found! Please recalibrate.")
   if len(peaks) > 1:
@@ -139,49 +199,6 @@ def find_peak_and_baseline(x: np.ndarray, y: np.ndarray) -> typing.Tuple[float, 
     i_max_peak = max(range(len(peaks)), key=lambda i: y[peaks[i]])
     return x[peaks[i_max_peak]], x[properties['left_bases'][i_max_peak]]
   return x[peaks[0]], x[properties['left_bases'][0]]
-  
-
-class ScanTracker:
-  """
-  Scan tracking data is persisted in scan_tracker.json
-  
-  Everytime an experiment completes, i.e. all scans completes, num_scans must be manually reset to 0
-  """
-  def __init__(self, file_path="scan_tracker.json"):
-    self.file_path = file_path
-    self.data = load_json(file_path)
-    self.device_type = None
-
-  def increment_scan(self):
-    self.data["num_scans"] += 1
-    save_json(self.data, self.file_path)
-
-  def is_calibration_scan(self):
-    return self.data["num_scans"] % N == 0
-
-  def update_peak_values(self, xvalues: np.ndarray, yvalues: np.ndarray):
-    # Filter data using butterworth
-    yvalues_filtered = butterworth_filter(yvalues)
-    # Get all samples where -0.4 mV <= applied potential >= -0.05 mV
-    start, end = np.searchsorted(xvalues, [-0.4, -0.05])
-    trunc_x = xvalues[end:start]
-    trunc_y = yvalues_filtered[end:start]
-    peak, baseline = find_peak_and_baseline(trunc_x, trunc_y)
-    self.data["peak"] = peak
-    self.data["left_baseline"] = baseline
-    save_json(self.data, self.file_path)
-    return yvalues_filtered
-
-  def get_replacements(self):
-    left_baseline = self.data["left_baseline"]
-    peak = self.data["peak"]
-    # Determine scanning windows
-    return {
-      "<E_begin_baseline>": f"{int(left_baseline*1000) + 30}m",
-      "<E_end_baseline>": f"{int(left_baseline*1000)}m",
-      "<E_begin_peak>": f"{int(peak*1000) + 30}m",
-      "<E_end_peak>": f"{int(peak*1000) - 30}m"
-    }
 
 
 def plot_curves(curves: list[list[list[palmsens.mscript.MScriptVar]]], base_path: str, scan_tracker: ScanTracker, partial=False):
@@ -226,7 +243,7 @@ def plot_curves(curves: list[list[list[palmsens.mscript.MScriptVar]]], base_path
         plt.plot(xvalues, yvalues, color=color, label=label)
         continue
       # Standard single plot for calibration
-      elif icurve == 0 and iy_axis == 0:
+      elif icurve == 1 and iy_axis == 0:
         # Determine peak and baseline for subsequent partial scans
         yvalues = scan_tracker.update_peak_values(xvalues, yvalues)
       plt.plot(xvalues, yvalues, label=label)
@@ -234,7 +251,7 @@ def plot_curves(curves: list[list[list[palmsens.mscript.MScriptVar]]], base_path
   # Display the legend and save the plot
   plt.legend()
   plt.savefig(base_path + '.png')
-  plt.show()
+  plt.close()
 
 
 def perform_scan(script_path: str, scan_tracker: ScanTracker, partial=False):
@@ -277,17 +294,60 @@ def perform_scan(script_path: str, scan_tracker: ScanTracker, partial=False):
   plot_curves(curves, base_path, scan_tracker=scan_tracker, partial=partial)
   scan_tracker.increment_scan()
 
+  print("Raspberry Pi: Function completed. Sending acknowledgment to Teensy.")
 
-def main():
-  configure_logging()
-  scan_tracker = ScanTracker()
+  # Send short pulse as acknowledgement signal to Teensy
+  ch_change_line.set_value(1)
+  time.sleep(1)
+  ch_change_line.set_value(0)
 
+
+def run_measurement(scan_tracker: ScanTracker):
   if scan_tracker.is_calibration_scan():
     perform_scan(SWV_ES_PATH, scan_tracker)
   else:
     replacements = scan_tracker.get_replacements()
     update_method_script(PARTIAL_SWV_ES_TEMPLATE_PATH, PARTIAL_SWV_ES_PATH, replacements)
     perform_scan(PARTIAL_SWV_ES_PATH, scan_tracker, partial=True)
+
+
+# Function to execute when Teensy acknowledgment is received
+def teensy_we_change_acknowledged(scan_tracker: ScanTracker):
+  print("Raspberry Pi: Received acknowledgment from Teensy.")
+  run_measurement(scan_tracker)
+
+
+def teensy_ch_change_acknowledged(scan_tracker: ScanTracker):
+  print("Raspberry Pi: Received acknowledgment from Teensy.")
+  run_measurement(scan_tracker)
+
+
+def teensy_cycle_acknowledged(scan_tracker: ScanTracker):
+  print("Raspberry Pi: Received cycle acknowledgment from Teensy. Exiting after final measurement.")
+  run_measurement(scan_tracker)
+  sys.exit(0)
+
+
+def main():
+  try:
+    setup()
+    run_measurement(scan_tracker)
+    while True:
+      # Wait for an edge event (blocking wait with timeout of 10 seconds)
+      if output_lines.event_wait():
+        # Process the edge event
+        events = output_lines.event_read()
+        for event in events:
+          if event.type == gpiod.LineEvent.RISING_EDGE:
+            if event.offset == CH_CHANGE_ACK_PIN:
+              teensy_ch_change_acknowledged(scan_tracker)
+            elif event.offset == CYCLE_CHANGE_ACK_PIN:
+              teensy_cycle_acknowledged(scan_tracker)
+      # Keep the program running indefinitely
+      time.sleep(1)
+  finally:
+    ch_change_line.release()
+    output_lines.release()
 
 
 if __name__ == '__main__':
