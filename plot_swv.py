@@ -88,10 +88,6 @@ def positive_int(val: str) -> int:
     raise argparse.ArgumentTypeError(f"{val} is not a positive integer")
   return ivalue
 
-parser = argparse.ArgumentParser(description="Process an electrode counter argument.")
-parser.add_argument("value", type=positive_int)
-elctrd_cntr: int = parser.parse_known_args()[0].value
-
 def setup():
   # Logging
   logging.basicConfig(level=logging.DEBUG, format='[%(module)s] %(message)s', stream=sys.stdout)
@@ -214,7 +210,7 @@ def concat_partial_scans(previous_scans: Curve, new_scan: Curve) -> Curve:
   b = np.asarray(new_scan)[:, 1:] # Exclude the redundant potential column
   return np.concatenate((a, b), axis=1).tolist()
 
-def perform_scan():
+def perform_scan(elctrd_cntr: int):
   LOG.info(f"Starting partial SWV scan including calibration scan.")
   directory_name = f"{elctrd_cntr}_{get_formatted_date()}"
   base_dir = os.path.join(OUTPUT_PATH, directory_name)
@@ -235,6 +231,7 @@ def perform_scan():
 
     calibration_scan, peak, baseline = perform_calibration_scan(device)
     partial_scans = perform_partial_scans(device, peak, baseline)
+    plot_curve(partial_scans, calibration_scan)
   
 def plot_curve(partial_scans: Curve, calibration_scan: Curve):
   plt.figure()
@@ -264,4 +261,16 @@ def plot_curve(partial_scans: Curve, calibration_scan: Curve):
   base_path = os.path.join(OUTPUT_PATH, base_name)
   plt.savefig(base_path + '.png')
   plt.close()
+
+def main():
+  parser = argparse.ArgumentParser(description="Process an electrode counter argument.")
+  parser.add_argument("value", type=positive_int)
+  args = parser.parse_args()
+  global elctrd_cntr
+  elctrd_cntr = args.value
+  setup()
+  perform_scan(elctrd_cntr)
+
+if __name__ == '__main__':
+  main()
 
