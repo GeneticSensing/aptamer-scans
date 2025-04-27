@@ -93,9 +93,19 @@ def setup():
   logging.basicConfig(level=logging.DEBUG, format='[%(module)s] %(message)s', stream=sys.stdout)
   logging.getLogger('matplotlib').setLevel(logging.INFO)
   logging.getLogger('PIL.PngImagePlugin').setLevel(logging.INFO)
+  # Arg parse
+  parser = argparse.ArgumentParser(description="Process an electrode counter argument.")
+  parser.add_argument("value", type=positive_int)
+  args = parser.parse_args()
+  global elctrd_cntr
+  elctrd_cntr = args.value
+  # Output dir
+  directory_name = f"{elctrd_cntr}_{get_formatted_date()}"
+  global base_dir
+  base_dir = os.path.join(OUTPUT_PATH, directory_name)
+  os.makedirs(base_dir, exist_ok=True)
 
 def write_curve_to_csv(file: typing.IO, curve: Curve):
-  file.write('sep=;\n')
   writer = csv.writer(file, delimiter=';')
   # Write header row.
   writer.writerow([f'{value.type.name} [{value.type.unit}]' for value in curve[0]])
@@ -180,7 +190,7 @@ def perform_calibration_scan(device: Instrument) -> tuple[Curve, float, float]:
   peak, baseline = find_peak_and_baseline(xvalues, yvalues)
   
   base_name = f"{elctrd_cntr}_FULL_100Hz_{get_formatted_date()}"
-  base_path = os.path.join(OUTPUT_PATH, base_name)
+  base_path = os.path.join(base_dir, base_name)
   with open(base_path + '.csv', 'wt', newline='') as f:
     write_curve_to_csv(f, calibration_scan)
   return calibration_scan, peak, baseline
@@ -193,14 +203,14 @@ def perform_partial_scans(device: Instrument, peak: float, baseline: float) -> C
     script_path = f"{PARTIAL_SWV_PATH_PREFIX}{scan}.mscr"
     update_method_script(template_path, script_path, replacements)
     partial_scan = exec_scan(script_path, device)
-    partial_scan[0][1].type.name += f" {scan}"
+    # partial_scan[0][1].type.name += f" {scan}"
     if not partial_scans:
       partial_scans = partial_scan
     else:
       partial_scans = concat_partial_scans(partial_scans, partial_scan)
 
   base_name = f"{elctrd_cntr}_PARTIAL_5-100Hz_{get_formatted_date()}"
-  base_path = os.path.join(OUTPUT_PATH, base_name)
+  base_path = os.path.join(base_dir, base_name)
   with open(base_path + '.csv', 'wt', newline='') as f:
     write_curve_to_csv(f, partial_scans)
   return partial_scans
@@ -212,10 +222,6 @@ def concat_partial_scans(previous_scans: Curve, new_scan: Curve) -> Curve:
 
 def perform_scan(elctrd_cntr: int):
   LOG.info(f"Starting partial SWV scan including calibration scan.")
-  directory_name = f"{elctrd_cntr}_{get_formatted_date()}"
-  base_dir = os.path.join(OUTPUT_PATH, directory_name)
-  os.makedirs(base_dir, exist_ok=True)
-
   port = DEVICE_PORT
   if port is None:
     port = palmsens.serial.auto_detect_port()
@@ -235,7 +241,7 @@ def perform_scan(elctrd_cntr: int):
   
 def plot_curve(partial_scans: Curve, calibration_scan: Curve):
   plt.figure()
-  plt.title(base_path)
+  plt.title(base_dir.replace(OUTPUT_PATH, ""))
   # Configure the X and Y axis labels
   xvar = calibration_scan[0][0]
   plt.xlabel(f'{xvar.type.name} [{xvar.type.unit}]')
@@ -258,16 +264,11 @@ def plot_curve(partial_scans: Curve, calibration_scan: Curve):
   # Display the legend and save the plot
   plt.legend()
   base_name = f"{elctrd_cntr}_5-100Hz_{get_formatted_date()}"
-  base_path = os.path.join(OUTPUT_PATH, base_name)
+  base_path = os.path.join(base_dir, base_name)
   plt.savefig(base_path + '.png')
-  plt.close()
+  plt.show()
 
 def main():
-  parser = argparse.ArgumentParser(description="Process an electrode counter argument.")
-  parser.add_argument("value", type=positive_int)
-  args = parser.parse_args()
-  global elctrd_cntr
-  elctrd_cntr = args.value
   setup()
   perform_scan(elctrd_cntr)
 

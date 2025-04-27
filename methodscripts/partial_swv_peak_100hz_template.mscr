@@ -1,8 +1,8 @@
 e
 var c
 var p
-set_pgstat_chan 1
-set_pgstat_mode 0
+var f
+var r
 set_pgstat_chan 0
 set_pgstat_mode 3
 set_max_bandwidth 4k
@@ -12,7 +12,7 @@ set_autoranging ba 59u 59u
 set_e 0
 cell_on
 # Measure SWV for peak
-meas_loop_swv p c <E_begin_peak> <E_end_peak> 1m 50m 100
+meas_loop_swv p c f r <E_begin_peak> <E_end_peak> 1m 50m 100
 	pck_start
 	pck_add p
 	pck_add c
