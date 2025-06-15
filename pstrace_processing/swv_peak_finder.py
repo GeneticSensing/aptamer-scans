@@ -178,7 +178,7 @@ def detect_peaks(x, y, val=0):
     plt.close()
     '''
     if val != 0:
-        return peak_idx, baseline_idx
+        return peak_voltage, baseline_voltage
     else:
         return {
         'peak_voltage': float(peak_voltage),

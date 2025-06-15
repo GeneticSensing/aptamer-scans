@@ -1,5 +1,7 @@
-Repeat 1
-(4, 4)
+Repeat 0
+(4, 1)
 full
-partial
-rest: 100
+rest: 1
+(4, 2)
+full
+rest: 1

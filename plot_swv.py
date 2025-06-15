@@ -143,7 +143,7 @@ def butterworth_filter(signal: np.ndarray) -> np.ndarray:
   return filtered_signal
 
 def find_peak_and_baseline(potentials: np.ndarray, currents: np.ndarray) -> tuple[float, float]:
-  return swv_peak_finder.detect_peaks(potentials, currents, 1)
+  #return swv_peak_finder.detect_peaks(potentials, currents, 1)
   # Parameters
   prominence_threshold = 5e-7
   distance_threshold = 100
@@ -189,14 +189,16 @@ def perform_calibration_scan(device: Instrument) -> tuple[Curve, float, float]:
   xvalues = palmsens.mscript.get_values_by_column([calibration_scan], 0)
   yvalues = palmsens.mscript.get_values_by_column([calibration_scan], 1)
   peak, baseline = find_peak_and_baseline(xvalues, yvalues)
-  
+  print(peak, baseline)
+  print('AAAAAAAAAAAAAA')
   base_name = f"{elctrd_cntr}_FULL_100Hz_{get_formatted_date()}"
   base_path = os.path.join(base_dir, base_name)
   with open(base_path + '.csv', 'wt', newline='') as f:
     write_curve_to_csv(f, calibration_scan)
   return calibration_scan, peak, baseline
 
-def perform_partial_scans(peak: float, baseline: float, device: Instrument) -> Curve:
+def perform_partial_scans(peak: float, baseline: float) -> Curve:
+    
   partial_scans: Curve = []
   for scan in PARTIAL_SWV_SCANS:
     replacements = get_replacements(peak, baseline)
@@ -232,8 +234,9 @@ def prep_for_scan(): # just connects to palmsens without running any scans, for 
       comm.close()
       raise RuntimeError("Device is not an Emstat Pico or EmStat4")
     LOG.info('Connected to %s.', device_type)
+  #return device
 
-def perform_scan():
+def full_scan():
   LOG.info(f"Starting partial SWV scan including calibration scan.")
   port = palmsens.serial.auto_detect_port()
   # Create and open serial connection to the device.
@@ -246,8 +249,7 @@ def perform_scan():
     LOG.info('Connected to %s.', device_type)
 
     calibration_scan, peak, baseline = perform_calibration_scan(device)
-    partial_scans = perform_partial_scans(peak, baseline, device)
-    plot_curve(partial_scans, calibration_scan)
+    return [calibration_scan, peak, baseline]
   
 def plot_curve(partial_scans: Curve, calibration_scan: Curve):
   plt.figure()

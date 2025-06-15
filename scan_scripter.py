@@ -1,29 +1,35 @@
-from plot_swv import perform_calibration_scan, perform_partial_scans, plot_curve, prep_for_scan, setup
+from plot_swv import perform_calibration_scan, perform_partial_scans, full_scan, plot_curve, prep_for_scan, setup
 import time
-from RPi_Teensy_comm import teensy_comm
+from teensy_comm import TeensyController
 
-FILENAME = 'scan_script.txt'
+SCAN_SEQUENCE = 'scan_script.txt'
 
 def open_txt(tc):
+    print('running open_txt')
     repeat = 0
     full_scans = []
     partial_scans = []
-    file = open(FILENAME, mode = 'r', encoding = 'utf-8-sig')
-    lines = file.readline()
+    with open(SCAN_SEQUENCE, 'r') as file:
+        lines = file.read().splitlines()
+    print(lines)
     if lines[0].find("epeat") != -1:
         repeat = int(lines[0].split()[1]) # Repeat x, gets x-val
         lines = lines[1:] #removes first line from list
+        print(lines)
     for i in range(repeat+1): #
-        for line in lines:    
+        for line in lines:
+            #print(line)    
             if line.find("full") != -1: #full
-                x = perform_calibration_scan()
+                x = full_scan()
                 full_scans.append(x[0])
                 peak, baseline = x[1], x[2]
             elif line.find("partial") != -1: #partial
-                partial_scans.append(perform_partial_scans(peak, baseline))
+                partial_scans.append(perform_partial_scans(peak, baseline, device))
             elif line.startswith("("): #(4, 5)
                 t = tuple(int(x.strip()) for x in line.strip("()").split(","))
-                tc.send_command(t[0], t[1])
+                chip, we = t
+                #print(chip, we)
+                print(tc.send_command(chip, we))
             elif line.startswith("rest:"): #rest: 100
                 time.sleep(int(line.split(":")[1].strip()))
     return partial_scans, full_scans
@@ -34,10 +40,12 @@ def plot(partial, full):
 
 def main():
     setup()
-    prep_for_scan()
-    tc = teensy_comm.TeensyController()
-    tc.connect()
-    plot(open_txt(tc))
+    #prep_for_scan()
+    tc = TeensyController()
+    conn_status = tc.connect()
+    print(conn_status)
+    open_txt(tc)
+    #plot(open_txt(tc))
     tc.disconnect()
 
 if __name__ == "__main__":
