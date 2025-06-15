@@ -1,0 +1,72 @@
+Git Version Control Quick User Guide
+////////////////////////////////////
+
+///////////////////////////////////////
+Section 1: New Raspberry Pi 5 Setup  //
+                                     //
+(First-time Git/GitHub users)        //
+///////////////////////////////////////
+
+1. Install Git
+
+>sudo apt update && sudo apt install git  
+
+2. Configure Identity
+
+>git config --global user.name "Your Name"  
+>git config --global user.email "your@email.com" 
+
+3. Generate SSH Key 
+
+>ssh-keygen -t ed25519 -C "your@email.com"  
+# Press Enter 3 times (default location, no passphrase)  
+
+4. Add Key to GitHub
+
+>cat ~/.ssh/id_ed25519.pub  
+
+5. Test Connection
+
+>.ssh -T git@github.com  
+# Should see: "Hi username! You've successfully authenticated..."  
+
+6. Clone Repository
+
+>git clone git@github.com:yourusername/aptamer-scans.git  
+>cd aptamer-scans  
+
+///////////////////////////////////////
+Section 2: Returning Users           //
+                                     //
+(Already configured devices)         //
+///////////////////////////////////////
+
+~~~ Daily Workflow ~~~
+
+Command	Description
+git status	Check changed files
+git pull	Fetch latest changes
+git add --all	Stage all changes
+git commit -m "Description"	Commit changes
+git push	Upload to GitHub
+
+~~~ Essential Commands ~~~
+
+# Clone repository  
+>git clone git@github.com:yourusername/repo.git  
+
+# Create new branch  
+>git checkout -b new-feature  
+
+# Switch branch  
+?git checkout main  
+
+# Merge branches  
+>git checkout main  
+>git merge new-feature  
+
+# Discard changes  
+>git checkout -- file.txt  
+
+# View history  
+>git log --oneline  
