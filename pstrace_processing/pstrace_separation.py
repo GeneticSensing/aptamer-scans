@@ -14,7 +14,7 @@ import pandas as pd
 from concurrent.futures import Future, ThreadPoolExecutor
 
 # Pre-fill this variable with the spreadsheet path and name
-SPREADSHEET_NAME = 'Glucose SELEX LOD with CA.xlsx'
+SPREADSHEET_NAME = 'frankenstein.xlsx'
 
 def process_and_save_csv(title: list[str], titleDuplicated: list[str], read_file: pd.DataFrame):
     # Process the column
@@ -27,7 +27,7 @@ def process_and_save_csv(title: list[str], titleDuplicated: list[str], read_file
     read_file = read_file.sort_index()
     
     # Save to CSV
-    csv_path = os.path.abspath(os.path.join('csv', f'{title}.csv'))
+    csv_path = os.path.abspath(os.path.join('pstrace_processing', 'csv', f'{title}.csv'))
     read_file.to_csv(csv_path, index=None, header=None, encoding="utf-8")
     
     return read_file

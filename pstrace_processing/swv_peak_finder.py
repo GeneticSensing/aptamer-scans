@@ -1,133 +1,195 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-Created on Wed Aug 14 19:44:09 2024
-Last Revised on Sat Sep 14 13:04:09 2024
-
-@author: ssadm
-"""
-
 import csv
 import os
+from concurrent.futures import Future, ThreadPoolExecutor
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter1d
+import scipy.signal as signal
 
-from scipy.signal import find_peaks
+# ==== Configuration ====
 
-# Pre-fill CSV file path and name for standalone execution
-FILENAME = "Glucose - 1.5 mM A.csv"
+PROJECT_NAME = 'Chronoamperometry-Aptamer'
+FILENAME = 'Lactate 1_lin_mod_noisy.xlsx'
 
-# Function to model the curve I(t) = (A * exp(-t/tau)) + B
-def model_function(params, t):
-    A = params['A']
-    tau = params['tau']
-    return A * np.exp(-t/tau)
+# Peak detection parameters
+VOLTAGE_WINDOW = 0.03                  # Voltage window around peak for refined averaging. 0.01 for very noisy data, <0.001 for smooth data
+GAUSSIAN_SMOOTHING_SIGMA = 40         # Smoothing level for peak detection. 35 for noisy data, 5 for smooth data.
+DERIVATIVE_MULTIPLYING_FACTOR = 1     # Multiplier for smoothing when computing derivatives. 1 for noisy data, 7 for smooth data.
+PEAK_INDEX_PADDING = 30               # Window to search for true max around initial peak index. 20 for noisy data, 1 for smooth data.
 
-# Function to calculate the residuals (difference between model and data)
-def residuals(params, t, data):
-    model = model_function(params, t)
-    return model - data
 
-# Read the CSV file
-def read_csv(file_name):
-    xdata = []
-    ydata = []
-    with open(file_name, 'r') as file:
-        reader = csv.reader(file)
-        next(reader)  # Skip the header if it exists
-        for row in reader:
-            xdata.append(float(row[0]))
-            ydata.append(float(row[1]))
-    del xdata[0:10]
-    del ydata[0:10]
-    return np.array(xdata), np.array(ydata)
+# ==== Utility Functions ====
 
-# Convert dataframe to numpy arrays
+def get_local_min(y, idx):
+    """Finds local minimum within PEAK_INDEX_PADDING around the given index."""
+    min_val = y[idx]
+    for offset in range(1, PEAK_INDEX_PADDING):
+        if idx + offset < len(y):
+            min_val = min(min_val, y[idx + offset])
+        if idx - offset >= 0:
+            min_val = min(min_val, y[idx - offset])
+    return min_val
+
+def average_current_near_voltage(x, y, center_idx):
+    """Averages current values within a voltage window centered around a given index."""
+    if not (0 <= center_idx < len(x)):
+        raise IndexError("Index out of bounds.")
+    ref_voltage = x[center_idx]
+    nearby_indices = np.where(np.abs(x - ref_voltage) <= VOLTAGE_WINDOW)[0]
+    return np.mean(y[nearby_indices])
+
+def estimate_baseline(x, y, peak_idx, order=1):
+    """
+    Estimate the baseline current using second and third derivatives.
+    Chooses the minimum current near local maxima of 2nd and 3rd derivatives.
+    """
+    d2 = gaussian_filter1d(y, DERIVATIVE_MULTIPLYING_FACTOR * GAUSSIAN_SMOOTHING_SIGMA, order=2)
+    d3 = gaussian_filter1d(y, DERIVATIVE_MULTIPLYING_FACTOR * GAUSSIAN_SMOOTHING_SIGMA, order=3)
+
+    if not (0 < peak_idx < len(y)):
+        raise ValueError("Invalid peak index.")
+
+    peaks_d2 = signal.argrelmax(d2[:peak_idx], order=order)[0]
+    peaks_d3 = signal.argrelmax(d3[:peak_idx], order=order)[0]
+
+    if len(peaks_d2) == 0 or len(peaks_d3) == 0:
+        return None
+
+    midpoint = int((peaks_d2[-1] + peaks_d3[-1]) / 2)
+    baseline_candidates = [
+        get_local_min(y, peaks_d2[-1]),
+        get_local_min(y, peaks_d3[-1]),
+        get_local_min(y, midpoint)
+    ]
+
+    min_current = min(baseline_candidates)
+    baseline_idx = np.where(y == min_current)[0][0]
+    refined_baseline = average_current_near_voltage(x, y, baseline_idx)
+
+    return baseline_idx, refined_baseline
+
 def read_df(df: pd.DataFrame):
+    """Reads voltage and current data from a pandas DataFrame and converts to numpy arrays."""
     title = df.columns[0]
-    xdata = df.iloc[1:, 0].astype(float).to_list()
-    ydata = df.iloc[1:, 1].astype(float).to_list()
-    del xdata[0:10]
-    del ydata[0:10]
+    x = df.iloc[1:, 0].astype(float).to_list()[10:]  # skip header and first 10 points
+    y = df.iloc[1:, 1].astype(float).to_list()[10:]
+    return np.array(x), np.array(y), title
 
-    return np.array(xdata), np.array(ydata), title
+def read_csv(filename):
+    """Reads voltage/current data from CSV file and removes first 10 points."""
+    x, y = [], []
+    with open(filename, 'r') as file:
+        reader = csv.reader(file)
+        next(reader)  # Skip header
+        for row in reader:
+            x.append(float(row[0]))
+            y.append(float(row[1]))
+    return np.array(x[10:]), np.array(y[10:])
 
-# Perform peak detection using scipy.signal.find_peaks
-def detect_peaks(xdata, ydata, filename):
-    prominence_threshold = 0.15
-    peaks, properties = find_peaks(ydata, prominence=prominence_threshold, distance=100)
-    result = {}
+# ==== Peak Detection ====
 
-    # Plot the data and the fitted curve
+def detect_backup_peak(x, y):
+    """
+    Finds the most prominent peak after Gaussian smoothing,
+    then refines the current by checking nearby values.
+    """
+    smoothed = gaussian_filter1d(y, GAUSSIAN_SMOOTHING_SIGMA)
+    local_max_indices = signal.argrelmax(smoothed)[0]
+
+    if len(local_max_indices) == 0:
+        return [], 0
+
+    max_idx = local_max_indices[np.argmax(smoothed[local_max_indices])]
+
+    max_current = y[max_idx]
+    for offset in range(1, PEAK_INDEX_PADDING):
+        if max_idx + offset < len(y):
+            max_current = max(max_current, y[max_idx + offset])
+        if max_idx - offset >= 0:
+            max_current = max(max_current, y[max_idx - offset])
+
+    refined_idx = np.where(y == max_current)[0][0]
+    refined_current = average_current_near_voltage(x, y, refined_idx)
+
+    return [refined_idx], refined_current
+
+def find_slope_based_baseline(smoothed, x, y, peak_idx):
+    """
+    Alternative baseline detection using the slope (first derivative)
+    change in regions before the peak.
+    """
+    dy_dx = gaussian_filter1d(smoothed, GAUSSIAN_SMOOTHING_SIGMA, order=1)
+    candidates = []
+
+    for i in range(6):
+        target_voltage = -0.066 * (5 - i)
+        idx = np.argmin(np.abs(x - target_voltage))
+        if idx < peak_idx:
+            candidates.append(idx)
+
+    slopes = [dy_dx[i + 1] - dy_dx[i] for i in range(len(candidates) - 1)]
+    max_slope_idx = slopes.index(max(slopes)) + 1
+    baseline_idx = candidates[max_slope_idx]
+
+    baseline_x = (x[baseline_idx] + x[baseline_idx + 2]) / 2
+    baseline_y = y[baseline_idx]
+
+    return [baseline_x, baseline_y]
+
+# ==== Peak Analysis and Plotting ====
+
+def detect_peaks(x, y, val=0):
+    """
+    Detects the peak and estimates the baseline.
+    Optionally generates and saves a plot.
+    """
+    #print('hello')
+    peak_indices, refined_current = detect_backup_peak(x, y)
+
+    if not peak_indices:
+        #print(f"[{label}] No peaks found.")
+        return {'peak_voltage': None, 'peak_current': None}
+
+    peak_idx = peak_indices[0]
+    peak_voltage = x[peak_idx]
+
+    # Estimate baseline
+    baseline_idx, baseline_current = estimate_baseline(x, y, peak_idx)
+    baseline_voltage = x[baseline_idx]
+
+    # Subtract baseline from peak
+    adjusted_current = refined_current - baseline_current
+    '''
+    # Plot (commented out during batch runs)
     plt.figure()
-    plt.scatter(xdata, ydata, label='Data')
-    plt.scatter(xdata[peaks], ydata[peaks], label='Peaks', color='red', marker='x', s=100)
+    plt.scatter(x, y, label='Raw Data')
+    plt.scatter(peak_voltage, refined_current, color='red', label='Peak', marker='x', s=100)
+    plt.scatter(baseline_voltage, baseline_current, color='black', label='Baseline', marker='x', s=100)
     plt.xlabel('Voltage (V)')
-    plt.ylabel('Current (uA)')
+    plt.ylabel('Current (μA)')
     plt.legend()
 
-    if len(peaks) == 0:
-        print("No peaks found!")
-    if len(peaks) > 1:
-        print("More than one peak found!")
-
-    # Annotate the peak with its potential, current, and magnitude
-    for i, peak_idx in enumerate(peaks):
-        x_peak = xdata[peak_idx]  # Potential at peak
-        y_peak = ydata[peak_idx]  # Current at peak
-
-        # Calculate the right baseline
-        right_base = properties['right_bases'][i]
-        y_right_baseline = ydata[right_base]
-
-        # Calculate the left baseline
-        left_base = properties['left_bases'][i]
-        y_left_baseline = ydata[left_base]
-
-        # Calculate the intersection point of the baseline line with the peak
-        peak_width = xdata[right_base] - xdata[left_base]
-        slope = (y_right_baseline - y_left_baseline) / peak_width
-        y_intersect = y_left_baseline + slope * (x_peak - xdata[left_base])
-
-        # Calculate the magnitude using the intersection point
-        magnitude = y_peak - y_intersect
-
-        # Draw a line between the left and right baselines
-        plt.plot([xdata[left_base], xdata[right_base]], [y_left_baseline, y_right_baseline], 'k--', linewidth=1)
-
-        # Draw a line from the peak to the intersection
-        plt.plot([x_peak, x_peak], [y_peak - magnitude, y_peak], 'k--', linewidth=1)
-        
-        # Create the annotation string
-        annotation_text = (
-            f'Potential: {x_peak:.2f} V\n'
-            f'Current: {y_peak:.2f} µA\n'
-            f'Magnitude: {abs(magnitude):.2f} µA'
-        )
-        
-        # Annotate at a slight offset from the peak (top right)
-        plt.annotate(annotation_text, (x_peak, y_peak),
-                    xytext=(10, 20), textcoords='offset points',
-                    arrowprops=dict(facecolor='black', arrowstyle='->'),
-                    fontsize=8)
-        
-        result = {'peak_voltage': x_peak, 'peak_amplitude': magnitude, 'peak_width': abs(peak_width)}
-
-    # Save the figure to the /figs directory
-    fig_path = os.path.abspath(os.path.join('figs', f'{filename}.png'))
+    # Save plot
+    fig_path = os.path.abspath(os.path.join('pstrace_processing/figs', f'{label}.png'))
+    os.makedirs(os.path.dirname(fig_path), exist_ok=True)
     plt.savefig(fig_path)
     plt.close()
+    '''
+    if val != 0:
+        return peak_idx, baseline_idx
+    else:
+        return {
+        'peak_voltage': float(peak_voltage),
+        'peak_current': float(adjusted_current)
+        }
 
-    return result
+# ==== Script Entry Point ====
 
-# Main function for standalone execution
 def main():
-    xdata, ydata = read_csv(FILENAME)
-    detect_peaks(xdata, ydata)
+    x, y = read_csv(FILENAME)
+    detect_peaks(x, y, os.path.splitext(os.path.basename(FILENAME))[0])
 
-# Allow the script to be both callable as a library and runnable as a standalone program
 if __name__ == '__main__':
     main()

@@ -58,6 +58,7 @@ import palmsens.instrument
 import palmsens.mscript
 import palmsens.serial
 from palmsens.instrument import Instrument
+from pstrace_processing import swv_peak_finder
 
 ### Types ###
 
@@ -115,7 +116,7 @@ def write_curve_to_csv(file: typing.IO, curve: Curve):
 def get_replacements(peak: float, left_baseline: float) -> dict[str, str]:
   return {
     "<E_begin_baseline>": f"{int(left_baseline*1000)}m",
-    "<E_end_baseline>": f"{int(left_baseline*1000) - 30}m",
+    "<E_end_baseline>": f"{int(left_baseline*1000) + 30}m", #not sure if this is right tho
     "<E_begin_peak>": f"{int(peak*1000) + 15}m",
     "<E_end_peak>": f"{int(peak*1000) - 15}m"
   }
@@ -142,6 +143,7 @@ def butterworth_filter(signal: np.ndarray) -> np.ndarray:
   return filtered_signal
 
 def find_peak_and_baseline(potentials: np.ndarray, currents: np.ndarray) -> tuple[float, float]:
+  return swv_peak_finder.detect_peaks(potentials, currents, 1)
   # Parameters
   prominence_threshold = 5e-7
   distance_threshold = 100
@@ -194,7 +196,7 @@ def perform_calibration_scan(device: Instrument) -> tuple[Curve, float, float]:
     write_curve_to_csv(f, calibration_scan)
   return calibration_scan, peak, baseline
 
-def perform_partial_scans(device: Instrument, peak: float, baseline: float) -> Curve:
+def perform_partial_scans(peak: float, baseline: float, device: Instrument) -> Curve:
   partial_scans: Curve = []
   for scan in PARTIAL_SWV_SCANS:
     replacements = get_replacements(peak, baseline)
@@ -219,6 +221,18 @@ def concat_partial_scans(previous_scans: Curve, new_scan: Curve) -> Curve:
   b = np.asarray(new_scan)
   return np.concatenate((a, b), axis=1).tolist()
 
+def prep_for_scan(): # just connects to palmsens without running any scans, for execution in other files. 
+  LOG.info(f"Starting partial SWV scan including calibration scan.")
+  port = palmsens.serial.auto_detect_port()
+  # Create and open serial connection to the device.
+  with palmsens.serial.Serial(port, 1) as comm:
+    device = Instrument(comm)
+    device_type = device.get_device_type()
+    if device_type != palmsens.instrument.DeviceType.EMSTAT_PICO and 'EmStat4' not in device_type:
+      comm.close()
+      raise RuntimeError("Device is not an Emstat Pico or EmStat4")
+    LOG.info('Connected to %s.', device_type)
+
 def perform_scan():
   LOG.info(f"Starting partial SWV scan including calibration scan.")
   port = palmsens.serial.auto_detect_port()
@@ -232,7 +246,7 @@ def perform_scan():
     LOG.info('Connected to %s.', device_type)
 
     calibration_scan, peak, baseline = perform_calibration_scan(device)
-    partial_scans = perform_partial_scans(device, peak, baseline)
+    partial_scans = perform_partial_scans(peak, baseline, device)
     plot_curve(partial_scans, calibration_scan)
   
 def plot_curve(partial_scans: Curve, calibration_scan: Curve):

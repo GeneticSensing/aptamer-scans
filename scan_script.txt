@@ -1,0 +1,5 @@
+Repeat 1
+(4, 4)
+full
+partial
+rest: 100
