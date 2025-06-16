@@ -240,7 +240,7 @@ def prep_for_scan(): # just connects to palmsens without running any scans, for 
   LOG.info(f"Starting partial SWV scan including calibration scan.")
   port = PORT #palmsens.serial.auto_detect_port()
   # Create and open serial connection to the device.
-  with palmsens.serial.Serial(port, 1) as comm:
+  with palmsens.serial.Serial(port, 5, baudrate=230400) as comm:
     device = Instrument(comm)
     device_type = device.get_device_type()
     if device_type != palmsens.instrument.DeviceType.EMSTAT_PICO and 'EmStat4' not in device_type:
@@ -253,7 +253,7 @@ def full_scan():
   LOG.info(f"Starting partial SWV scan including calibration scan.")
   port = PORT #palmsens.serial.auto_detect_port()
   # Create and open serial connection to the device.
-  with palmsens.serial.Serial(port, 1) as comm:
+  with palmsens.serial.Serial(port, 5, baudrate=230400) as comm:
     device = Instrument(comm)
     device_type = device.get_device_type()
     if device_type != palmsens.instrument.DeviceType.EMSTAT_PICO and 'EmStat4' not in device_type:
@@ -268,7 +268,7 @@ def partial_scan(peak, baseline):
   LOG.info(f"Starting partial SWV scan including calibration scan.")
   port = PORT #palmsens.serial.auto_detect_port()
   # Create and open serial connection to the device.
-  with palmsens.serial.Serial(port, 1) as comm:
+  with palmsens.serial.Serial(port, 5, 230400) as comm:
     device = Instrument(comm)
     device_type = device.get_device_type()
     if device_type != palmsens.instrument.DeviceType.EMSTAT_PICO and 'EmStat4' not in device_type:
