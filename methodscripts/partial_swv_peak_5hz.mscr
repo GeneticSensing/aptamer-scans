@@ -12,7 +12,7 @@ set_autoranging ba 59u 59u
 set_e 0
 cell_on
 # Measure SWV for peak
-meas_loop_swv p c f r -234m -264m 1m 50m 5
+meas_loop_swv p c f r 153015m 152985m 1m 50m 5
 	pck_start
 	pck_add p
 	pck_add c

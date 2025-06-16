@@ -1,14 +1,20 @@
-from plot_swv import perform_calibration_scan, perform_partial_scans, full_scan, plot_curve, prep_for_scan, setup
+from plot_swv import perform_calibration_scan, partial_scan, full_scan, plot_curve, prep_for_scan, setup
 import time
 from teensy_comm import TeensyController
+#from pstrace_processing import swv_processing, pstrace_separation
 
 SCAN_SEQUENCE = 'scan_script.txt'
+
+#def csv_plotter(path)
+    # plot a csv
+    
 
 def open_txt(tc):
     print('running open_txt')
     repeat = 0
     full_scans = []
     partial_scans = []
+    chpwe = []
     with open(SCAN_SEQUENCE, 'r') as file:
         lines = file.read().splitlines()
     print(lines)
@@ -24,15 +30,29 @@ def open_txt(tc):
                 full_scans.append(x[0])
                 peak, baseline = x[1], x[2]
             elif line.find("partial") != -1: #partial
-                partial_scans.append(perform_partial_scans(peak, baseline, device))
+                partial_scans.append(partial_scan(peak, baseline))
             elif line.startswith("("): #(4, 5)
                 t = tuple(int(x.strip()) for x in line.strip("()").split(","))
                 chip, we = t
-                #print(chip, we)
+                chpwe.append(t)
                 print(tc.send_command(chip, we))
             elif line.startswith("rest:"): #rest: 100
                 time.sleep(int(line.split(":")[1].strip()))
-    return partial_scans, full_scans
+    print(partial_scans)
+    print('TEST')
+    print(full_scans)
+    print('TEST')
+    print(chpwe)
+    return partial_scans, full_scans, chpwe
+
+'''
+def data_compiler(partial_scans, full_scans, chpwe) #4 full, 4 partial per chpwe
+    for i in range(len(chpwe)):
+        for scan in full_scans:
+            write row(chpwe, 'full', voltage, values)
+            write row (chpwe, 'full', current, values
+'''           
+        
 
 def plot(partial, full):
     for x, y in partial, full:

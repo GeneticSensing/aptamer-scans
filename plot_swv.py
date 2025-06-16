@@ -143,7 +143,11 @@ def butterworth_filter(signal: np.ndarray) -> np.ndarray:
   return filtered_signal
 
 def find_peak_and_baseline(potentials: np.ndarray, currents: np.ndarray) -> tuple[float, float]:
-  #return swv_peak_finder.detect_peaks(potentials, currents, 1)
+  start, end = np.searchsorted(potentials, [-0.4, -0.05])
+  trunc_x = potentials[start:end]
+  trunc_y = currents[start:end]
+  print(trunc_x, trunc_y)
+  return swv_peak_finder.detect_peaks(trunc_x, trunc_y, 1)
   # Parameters
   prominence_threshold = 5e-7
   distance_threshold = 100
@@ -154,6 +158,7 @@ def find_peak_and_baseline(potentials: np.ndarray, currents: np.ndarray) -> tupl
   start, end = np.searchsorted(potentials, [-0.4, -0.05])
   trunc_x = potentials[start:end]
   trunc_y = currents_butter[start:end]
+ 
   # TODO: Apply baseline correction
   peaks, properties = sg.find_peaks(-trunc_y, prominence=prominence_threshold, distance=distance_threshold)
   if len(peaks) == 0:
@@ -189,15 +194,14 @@ def perform_calibration_scan(device: Instrument) -> tuple[Curve, float, float]:
   xvalues = palmsens.mscript.get_values_by_column([calibration_scan], 0)
   yvalues = palmsens.mscript.get_values_by_column([calibration_scan], 1)
   peak, baseline = find_peak_and_baseline(xvalues, yvalues)
-  print(peak, baseline)
-  print('AAAAAAAAAAAAAA')
+  print('peak and baseline: ', peak, baseline)
   base_name = f"{elctrd_cntr}_FULL_100Hz_{get_formatted_date()}"
   base_path = os.path.join(base_dir, base_name)
   with open(base_path + '.csv', 'wt', newline='') as f:
     write_curve_to_csv(f, calibration_scan)
-  return calibration_scan, peak, baseline
+  return [xvalues, yvalues], peak, baseline
 
-def perform_partial_scans(peak: float, baseline: float) -> Curve:
+def perform_partial_scans(peak: float, baseline: float, device: Instrument) -> Curve:
     
   partial_scans: Curve = []
   for scan in PARTIAL_SWV_SCANS:
@@ -211,12 +215,14 @@ def perform_partial_scans(peak: float, baseline: float) -> Curve:
       partial_scans = partial_scan
     else:
       partial_scans = concat_partial_scans(partial_scans, partial_scan)
-
+  xvalues = palmsens.mscript.get_values_by_column([partial_scans], 0)
+  yvalues = palmsens.mscript.get_values_by_column([partial_scans], 1)
+  
   base_name = f"{elctrd_cntr}_PARTIAL_5-100Hz_{get_formatted_date()}"
   base_path = os.path.join(base_dir, base_name)
   with open(base_path + '.csv', 'wt', newline='') as f:
     write_curve_to_csv(f, partial_scans)
-  return partial_scans
+  return [xvalues, yvalues]
 
 def concat_partial_scans(previous_scans: Curve, new_scan: Curve) -> Curve:
   a = np.asarray(previous_scans)
@@ -250,6 +256,21 @@ def full_scan():
 
     calibration_scan, peak, baseline = perform_calibration_scan(device)
     return [calibration_scan, peak, baseline]
+
+def partial_scan(peak, baseline):
+  LOG.info(f"Starting partial SWV scan including calibration scan.")
+  port = palmsens.serial.auto_detect_port()
+  # Create and open serial connection to the device.
+  with palmsens.serial.Serial(port, 1) as comm:
+    device = Instrument(comm)
+    device_type = device.get_device_type()
+    if device_type != palmsens.instrument.DeviceType.EMSTAT_PICO and 'EmStat4' not in device_type:
+      comm.close()
+      raise RuntimeError("Device is not an Emstat Pico or EmStat4")
+    LOG.info('Connected to %s.', device_type)
+
+    partials = perform_partial_scans(peak, baseline, device)
+    return partials
   
 def plot_curve(partial_scans: Curve, calibration_scan: Curve):
   plt.figure()

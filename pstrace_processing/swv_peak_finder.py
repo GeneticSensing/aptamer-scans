@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter1d
 import scipy.signal as signal
+import random
 
 # ==== Configuration ====
 
@@ -14,10 +15,10 @@ PROJECT_NAME = 'Chronoamperometry-Aptamer'
 FILENAME = 'Lactate 1_lin_mod_noisy.xlsx'
 
 # Peak detection parameters
-VOLTAGE_WINDOW = 0.03                  # Voltage window around peak for refined averaging. 0.01 for very noisy data, <0.001 for smooth data
-GAUSSIAN_SMOOTHING_SIGMA = 40         # Smoothing level for peak detection. 35 for noisy data, 5 for smooth data.
-DERIVATIVE_MULTIPLYING_FACTOR = 1     # Multiplier for smoothing when computing derivatives. 1 for noisy data, 7 for smooth data.
-PEAK_INDEX_PADDING = 30               # Window to search for true max around initial peak index. 20 for noisy data, 1 for smooth data.
+VOLTAGE_WINDOW = 0.001                  # Voltage window around peak for refined averaging. 0.01 for very noisy data, <0.001 for smooth data
+GAUSSIAN_SMOOTHING_SIGMA = 5         # Smoothing level for peak detection. 35 for noisy data, 5 for smooth data.
+DERIVATIVE_MULTIPLYING_FACTOR = 7     # Multiplier for smoothing when computing derivatives. 1 for noisy data, 7 for smooth data.
+PEAK_INDEX_PADDING = 1               # Window to search for true max around initial peak index. 20 for noisy data, 1 for smooth data.
 
 
 # ==== Utility Functions ====
@@ -27,9 +28,9 @@ def get_local_min(y, idx):
     min_val = y[idx]
     for offset in range(1, PEAK_INDEX_PADDING):
         if idx + offset < len(y):
-            min_val = min(min_val, y[idx + offset])
+            min_val = max(min_val, y[idx + offset])
         if idx - offset >= 0:
-            min_val = min(min_val, y[idx - offset])
+            min_val = max(min_val, y[idx - offset])
     return min_val
 
 def average_current_near_voltage(x, y, center_idx):
@@ -41,19 +42,20 @@ def average_current_near_voltage(x, y, center_idx):
     return np.mean(y[nearby_indices])
 
 def estimate_baseline(x, y, peak_idx, order=1):
+    
     """
     Estimate the baseline current using second and third derivatives.
     Chooses the minimum current near local maxima of 2nd and 3rd derivatives.
     """
     d2 = gaussian_filter1d(y, DERIVATIVE_MULTIPLYING_FACTOR * GAUSSIAN_SMOOTHING_SIGMA, order=2)
     d3 = gaussian_filter1d(y, DERIVATIVE_MULTIPLYING_FACTOR * GAUSSIAN_SMOOTHING_SIGMA, order=3)
+    
+    # if not (0 < peak_idx < len(y)):
+        #raise ValueError("Invalid peak index.")
+    peaks_d2 = signal.argrelmin(d2[:peak_idx], order=order)[0]
+    peaks_d3 = signal.argrelmin(d3[:peak_idx], order=order)[0]
 
-    if not (0 < peak_idx < len(y)):
-        raise ValueError("Invalid peak index.")
-
-    peaks_d2 = signal.argrelmax(d2[:peak_idx], order=order)[0]
-    peaks_d3 = signal.argrelmax(d3[:peak_idx], order=order)[0]
-
+    print('d2 d3: ', peaks_d2, peaks_d3)
     if len(peaks_d2) == 0 or len(peaks_d3) == 0:
         return None
 
@@ -64,10 +66,10 @@ def estimate_baseline(x, y, peak_idx, order=1):
         get_local_min(y, midpoint)
     ]
 
-    min_current = min(baseline_candidates)
+    min_current = max(baseline_candidates)
     baseline_idx = np.where(y == min_current)[0][0]
     refined_baseline = average_current_near_voltage(x, y, baseline_idx)
-
+    print(baseline_idx, refined_baseline, '<- OUTPUT OF BASELINE ESTIMATE')
     return baseline_idx, refined_baseline
 
 def read_df(df: pd.DataFrame):
@@ -95,24 +97,27 @@ def detect_backup_peak(x, y):
     Finds the most prominent peak after Gaussian smoothing,
     then refines the current by checking nearby values.
     """
+    print("BACKUP PEAKS RUNNING")
+    print(x, y)
     smoothed = gaussian_filter1d(y, GAUSSIAN_SMOOTHING_SIGMA)
-    local_max_indices = signal.argrelmax(smoothed)[0]
-
+    print('SMOOTHING: ', smoothed)
+    local_max_indices = signal.argrelmin(smoothed)[0]
+    print(local_max_indices)
     if len(local_max_indices) == 0:
         return [], 0
-
-    max_idx = local_max_indices[np.argmax(smoothed[local_max_indices])]
+    
+    max_idx = local_max_indices[np.argmin(smoothed[local_max_indices])]
 
     max_current = y[max_idx]
     for offset in range(1, PEAK_INDEX_PADDING):
         if max_idx + offset < len(y):
-            max_current = max(max_current, y[max_idx + offset])
+            max_current = min(max_current, y[max_idx + offset])
         if max_idx - offset >= 0:
-            max_current = max(max_current, y[max_idx - offset])
+            max_current = min(max_current, y[max_idx - offset])
 
     refined_idx = np.where(y == max_current)[0][0]
     refined_current = average_current_near_voltage(x, y, refined_idx)
-
+    print([refined_idx], refined_current, '<- OUTPUT OF BACKUP PEAKS')
     return [refined_idx], refined_current
 
 def find_slope_based_baseline(smoothed, x, y, peak_idx):
@@ -147,21 +152,21 @@ def detect_peaks(x, y, val=0):
     """
     #print('hello')
     peak_indices, refined_current = detect_backup_peak(x, y)
-
+    '''
     if not peak_indices:
         #print(f"[{label}] No peaks found.")
         return {'peak_voltage': None, 'peak_current': None}
-
+    '''
     peak_idx = peak_indices[0]
     peak_voltage = x[peak_idx]
-
+    print('PEAK IDX: ', peak_idx)
     # Estimate baseline
     baseline_idx, baseline_current = estimate_baseline(x, y, peak_idx)
     baseline_voltage = x[baseline_idx]
 
     # Subtract baseline from peak
     adjusted_current = refined_current - baseline_current
-    '''
+    
     # Plot (commented out during batch runs)
     plt.figure()
     plt.scatter(x, y, label='Raw Data')
@@ -170,15 +175,15 @@ def detect_peaks(x, y, val=0):
     plt.xlabel('Voltage (V)')
     plt.ylabel('Current (μA)')
     plt.legend()
-
+    label = random.random()
     # Save plot
     fig_path = os.path.abspath(os.path.join('pstrace_processing/figs', f'{label}.png'))
     os.makedirs(os.path.dirname(fig_path), exist_ok=True)
     plt.savefig(fig_path)
     plt.close()
-    '''
+    
     if val != 0:
-        return peak_voltage, baseline_voltage
+        return peak_idx, baseline_idx
     else:
         return {
         'peak_voltage': float(peak_voltage),
