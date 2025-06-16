@@ -76,7 +76,7 @@ def data_compiler(partial_scans, full_scans, chpwe, peak, peaks_partial): #4 ful
             for x in range(len(full_scans[i])):
                 writer2.writerow([chpwe[i][0], chpwe[i][1], 'full', str(peak[x][0][0][-1]), peak[x][1]])
             for x in range(len(partial_scans[i])):
-                writer2.writerow([chpwe[i][0], chpwe[i][1], 'partial', str(peaks_partial[x]))
+                writer2.writerow([chpwe[i][0], chpwe[i][1], 'partial', str(peaks_partial[x])])
             for scan in partial_scans[i]:
                 x=[chpwe[i][0], chpwe[i][1], 'partial', 'voltage']
                 x.extend(scan[0])
