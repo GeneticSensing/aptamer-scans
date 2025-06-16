@@ -2,3 +2,6 @@ Repeat 0
 (4, 1)
 full
 partial
+(4, 2)
+full
+partial

@@ -66,6 +66,7 @@ Curve = list[list[palmsens.mscript.MScriptVar]]
 
 ### Constants ###
 
+PORT = '/dev/ttyUSB0'  # Hardcoded Serial Port
 LOG = logging.getLogger(__name__)
 # Paths
 CALIBRATION_SWV_PATH = 'methodscripts/swv_calibration.mscr'
@@ -142,6 +143,10 @@ def butterworth_filter(signal: np.ndarray) -> np.ndarray:
   filtered_signal = sg.filtfilt(b, a, signal)
   return filtered_signal
 
+def find_partial_peak(potentials, currents):
+  potentials = potentials[3:]
+  average = sum(potentials) / len(potentials)
+  
 def find_peak_and_baseline(potentials: np.ndarray, currents: np.ndarray) -> tuple[float, float]:
   start, end = np.searchsorted(potentials, [-0.4, -0.05])
   trunc_x = potentials[start:end]
@@ -193,13 +198,13 @@ def perform_calibration_scan(device: Instrument) -> tuple[Curve, float, float]:
   # Update baseline and peak values
   xvalues = palmsens.mscript.get_values_by_column([calibration_scan], 0)
   yvalues = palmsens.mscript.get_values_by_column([calibration_scan], 1)
-  peak, baseline = find_peak_and_baseline(xvalues, yvalues)
+  peak, baseline, pkval, blval = find_peak_and_baseline(xvalues, yvalues)
   print('peak and baseline: ', peak, baseline)
   base_name = f"{elctrd_cntr}_FULL_100Hz_{get_formatted_date()}"
   base_path = os.path.join(base_dir, base_name)
   with open(base_path + '.csv', 'wt', newline='') as f:
     write_curve_to_csv(f, calibration_scan)
-  return [xvalues, yvalues], peak, baseline
+  return [xvalues, yvalues], pkval, blval
 
 def perform_partial_scans(peak: float, baseline: float, device: Instrument) -> Curve:
     
@@ -217,6 +222,8 @@ def perform_partial_scans(peak: float, baseline: float, device: Instrument) -> C
       partial_scans = concat_partial_scans(partial_scans, partial_scan)
   xvalues = palmsens.mscript.get_values_by_column([partial_scans], 0)
   yvalues = palmsens.mscript.get_values_by_column([partial_scans], 1)
+  print(yvalues, '<- PARTIAL SCAN X AND Y VALUES')
+  #peak, baseline, pkval, blval = find_partial_peak(xvalues, yvalues)
   
   base_name = f"{elctrd_cntr}_PARTIAL_5-100Hz_{get_formatted_date()}"
   base_path = os.path.join(base_dir, base_name)
@@ -231,7 +238,7 @@ def concat_partial_scans(previous_scans: Curve, new_scan: Curve) -> Curve:
 
 def prep_for_scan(): # just connects to palmsens without running any scans, for execution in other files. 
   LOG.info(f"Starting partial SWV scan including calibration scan.")
-  port = palmsens.serial.auto_detect_port()
+  port = PORT #palmsens.serial.auto_detect_port()
   # Create and open serial connection to the device.
   with palmsens.serial.Serial(port, 1) as comm:
     device = Instrument(comm)
@@ -244,7 +251,7 @@ def prep_for_scan(): # just connects to palmsens without running any scans, for 
 
 def full_scan():
   LOG.info(f"Starting partial SWV scan including calibration scan.")
-  port = palmsens.serial.auto_detect_port()
+  port = PORT #palmsens.serial.auto_detect_port()
   # Create and open serial connection to the device.
   with palmsens.serial.Serial(port, 1) as comm:
     device = Instrument(comm)
@@ -259,7 +266,7 @@ def full_scan():
 
 def partial_scan(peak, baseline):
   LOG.info(f"Starting partial SWV scan including calibration scan.")
-  port = palmsens.serial.auto_detect_port()
+  port = PORT #palmsens.serial.auto_detect_port()
   # Create and open serial connection to the device.
   with palmsens.serial.Serial(port, 1) as comm:
     device = Instrument(comm)

@@ -56,8 +56,8 @@ def estimate_baseline(x, y, peak_idx, order=1):
     peaks_d3 = signal.argrelmin(d3[:peak_idx], order=order)[0]
 
     print('d2 d3: ', peaks_d2, peaks_d3)
-    if len(peaks_d2) == 0 or len(peaks_d3) == 0:
-        return None
+    #if len(peaks_d2) == 0 or len(peaks_d3) == 0:
+        #return None
 
     midpoint = int((peaks_d2[-1] + peaks_d3[-1]) / 2)
     baseline_candidates = [
@@ -157,15 +157,17 @@ def detect_peaks(x, y, val=0):
         #print(f"[{label}] No peaks found.")
         return {'peak_voltage': None, 'peak_current': None}
     '''
+    
     peak_idx = peak_indices[0]
     peak_voltage = x[peak_idx]
     print('PEAK IDX: ', peak_idx)
     # Estimate baseline
     baseline_idx, baseline_current = estimate_baseline(x, y, peak_idx)
     baseline_voltage = x[baseline_idx]
+    print('BASELINE VOLTAGE VALUES ARE AS FOLLOWS: ', baseline_voltage)
 
     # Subtract baseline from peak
-    adjusted_current = refined_current - baseline_current
+    #adjusted_current = refined_current - baseline_current
     
     # Plot (commented out during batch runs)
     plt.figure()
@@ -183,7 +185,7 @@ def detect_peaks(x, y, val=0):
     plt.close()
     
     if val != 0:
-        return peak_idx, baseline_idx
+        return peak_idx, baseline_idx, peak_voltage, baseline_voltage
     else:
         return {
         'peak_voltage': float(peak_voltage),
