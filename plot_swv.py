@@ -145,7 +145,10 @@ def butterworth_filter(signal: np.ndarray) -> np.ndarray:
 
 def find_partial_peak(potentials, currents):
   potentials = potentials[3:]
-  average = sum(potentials) / len(potentials)
+  average_potentials = sum(potentials) / len(potentials)
+  currents = currents[3:]
+  average_currents = sum(currents) / len(currents)
+  return average_potentials, average_currents
   
 def find_peak_and_baseline(potentials: np.ndarray, currents: np.ndarray) -> tuple[float, float]:
   start, end = np.searchsorted(potentials, [-0.4, -0.05])
@@ -223,13 +226,14 @@ def perform_partial_scans(peak: float, baseline: float, device: Instrument) -> C
   xvalues = palmsens.mscript.get_values_by_column([partial_scans], 0)
   yvalues = palmsens.mscript.get_values_by_column([partial_scans], 1)
   print(yvalues, '<- PARTIAL SCAN X AND Y VALUES')
+  peak_x, peak_y = find_partial_peak(xvalues, yvalues)
   #peak, baseline, pkval, blval = find_partial_peak(xvalues, yvalues)
   
   base_name = f"{elctrd_cntr}_PARTIAL_5-100Hz_{get_formatted_date()}"
   base_path = os.path.join(base_dir, base_name)
   with open(base_path + '.csv', 'wt', newline='') as f:
     write_curve_to_csv(f, partial_scans)
-  return [xvalues, yvalues]
+  return [xvalues, yvalues], peak_y
 
 def concat_partial_scans(previous_scans: Curve, new_scan: Curve) -> Curve:
   a = np.asarray(previous_scans)
@@ -276,8 +280,8 @@ def partial_scan(peak, baseline):
       raise RuntimeError("Device is not an Emstat Pico or EmStat4")
     LOG.info('Connected to %s.', device_type)
 
-    partials = perform_partial_scans(peak, baseline, device)
-    return partials
+    partials, peak_partial = perform_partial_scans(peak, baseline, device)
+    return partials, peak_partial
   
 def plot_curve(partial_scans: Curve, calibration_scan: Curve):
   plt.figure()

@@ -18,6 +18,7 @@ def open_txt(tc):
     partial_scans = [[], [], [], []]
     chpwe = []
     peaks = []
+    peaks_partial = []
     with open(SCAN_SEQUENCE, 'r') as file:
         lines = file.read().splitlines()
     print(lines)
@@ -37,7 +38,9 @@ def open_txt(tc):
                 peaks.append([peaks,baseline])
             elif line.find("partial") != -1: #partial
                 x = partial_scan(peak, baseline)
-                partial_scans[a].append(x)
+                partial_scans[a].append(x[0])
+                peaks = x[1]
+                peaks_partial.append(peaks)
             elif line.startswith("("): #(4, 5)
                 t = tuple(int(x.strip()) for x in line.strip("()").split(","))
                 chip, we = t
@@ -51,10 +54,10 @@ def open_txt(tc):
     print(full_scans)
     print('TEST')
     print(chpwe)
-    return partial_scans, full_scans, chpwe, peaks
+    return partial_scans, full_scans, chpwe, peaks, peaks_partial
 
 
-def data_compiler(partial_scans, full_scans, chpwe, peak): #4 full, 4 partial per chpwe
+def data_compiler(partial_scans, full_scans, chpwe, peak, peaks_partial): #4 full, 4 partial per chpwe
     csv_path = os.path.abspath(os.path.join('output', 'summary.csv'))
     peak_csv_path = os.path.abspath(os.path.join('output', 'peaks.csv'))
     with open(csv_path, 'w') as f1, open(peak_csv_path, 'w') as f2:
@@ -72,6 +75,8 @@ def data_compiler(partial_scans, full_scans, chpwe, peak): #4 full, 4 partial pe
                 writer1.writerow(x)
             for x in range(len(full_scans[i])):
                 writer2.writerow([chpwe[i][0], chpwe[i][1], 'full', str(peak[x][0][0][-1]), peak[x][1]])
+            for x in range(len(partial_scans[i])):
+                writer2.writerow([chpwe[i][0], chpwe[i][1], 'partial', str(peaks_partial[x]))
             for scan in partial_scans[i]:
                 x=[chpwe[i][0], chpwe[i][1], 'partial', 'voltage']
                 x.extend(scan[0])
@@ -91,10 +96,10 @@ def main():
     tc = TeensyController()
     conn_status = tc.connect()
     print(conn_status)
-    partial, full, chpwe, peak = open_txt(tc)
+    partial, full, chpwe, peak, peaks_partial = open_txt(tc)
     #plot(open_txt(tc))
     tc.disconnect()
-    data_compiler(partial, full, chpwe, peak)
+    data_compiler(partial, full, chpwe, peak, peaks_partial)
 
 if __name__ == "__main__":
     main()
